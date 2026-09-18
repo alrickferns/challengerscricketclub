@@ -216,7 +216,7 @@ const Draft = (() => {
             canvas.className = 'draft-confetti-canvas';
             screenEl.appendChild(canvas);
         }
-
+        if (!canvas || typeof canvas.getContext !== 'function') return;
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         const ctx = canvas.getContext('2d');
@@ -1023,8 +1023,9 @@ const Draft = (() => {
     /** Draw SVG/Canvas wheel */
     function drawWheelCanvas(draft, rotationAngle = 0) {
         const canvas = document.getElementById('toss-wheel-canvas');
-        if (!canvas) return;
+        if (!canvas || typeof canvas.getContext !== 'function') return;
         const ctx = canvas.getContext('2d');
+        if (!ctx) return;
         const numSlices = draft.teams.length;
         const sliceAngle = (2 * Math.PI) / numSlices;
         const radius = canvas.width / 2;
