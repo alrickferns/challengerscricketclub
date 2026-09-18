@@ -1,0 +1,18 @@
+{
+    "name": "Challengers Cricket Club",
+    "short_name": "Challengers",
+    "description": "Match Day Management for Challengers Cricket Club",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#0f1f17",
+    "theme_color": "#0f1f17",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "logo.png",
+            "sizes": "800x800",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
