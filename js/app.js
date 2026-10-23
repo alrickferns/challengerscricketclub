@@ -14,6 +14,9 @@ const App = (() => {
        INITIALIZATION
     ---------------------------------------------------------- */
     function init() {
+        if (window.Auth && Auth.deduplicatePlayersAndMatches) {
+            Auth.deduplicatePlayersAndMatches();
+        }
         if (window.DB && DB.init) {
             DB.init();
         }
@@ -45,7 +48,10 @@ const App = (() => {
 
         currentScreen = name;
 
-        // Screen-specific setup
+        // Clean up draft timers if navigating away from draft
+        if (name !== 'draft' && typeof window.Draft !== 'undefined' && Draft.stopTurnTimer) {
+            Draft.stopTurnTimer();
+        }
         switch (name) {
             case 'home':
                 renderHome();
@@ -1347,7 +1353,8 @@ const App = (() => {
         shareSquadWhatsApp,
         handleToggleLock,
         handleReorderPlayer,
-        handleTransferPlayer
+        handleTransferPlayer,
+        toDateString
     };
 })();
 

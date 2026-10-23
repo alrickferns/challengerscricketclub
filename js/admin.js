@@ -3,87 +3,245 @@
    ============================================================ */
 const Admin = (() => {
 
-    /** Render the admin match management list */
-    function renderAdminPanel() {
-        const listEl = document.getElementById('admin-match-list');
-        if (!listEl) return;
+    /** Safe HTML escaping helper */
+    function safeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/'/g, '&#39;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
 
-        // In Admin Panel, show ALL matches sorted by date
-        const allMatches = (typeof Matches !== 'undefined' && Matches.getAll) ? Matches.getAll() : [];
-        const matches = (Array.isArray(allMatches) ? allMatches : []).filter(m => m && typeof m === 'object').sort((a, b) => {
-            const dateComp = (a.date || '').localeCompare(b.date || '');
-            if (dateComp !== 0) return dateComp;
-            return (a.startTime || a.time || '').localeCompare(b.startTime || b.time || '');
-        });
+    /** Convert Date to local YYYY-MM-DD */
+    function getLocalDateString(d = new Date()) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
 
-        if (matches.length === 0) {
-            const isLiveDb = typeof window !== 'undefined' && window.DB && window.DB.isLive && window.DB.isLive();
-            listEl.innerHTML = `
-                <div class="empty-state-small">
-                    <p>${isLiveDb ? 'No matches found in database. Create one above!' : 'No matches found. Create one above!'}</p>
-                </div>`;
-            return;
+    let activeTab = 'upcoming'; // 'upcoming' | 'past'
+    let matchSearchQuery = '';
+    let isCreateFormOpen = false;
+
+    /** Toggle the Create New Match form open/closed */
+    function toggleCreateForm(forceOpen = null) {
+        const formEl = document.getElementById('create-match-form');
+        const iconEl = document.getElementById('create-toggle-icon');
+        const labelEl = document.getElementById('create-toggle-label');
+        if (!formEl) return;
+
+        isCreateFormOpen = (forceOpen !== null) ? forceOpen : !isCreateFormOpen;
+        formEl.style.display = isCreateFormOpen ? 'flex' : 'none';
+        if (iconEl) iconEl.textContent = isCreateFormOpen ? '✕' : '+';
+        if (labelEl) labelEl.textContent = isCreateFormOpen ? 'Close Form' : 'New Match';
+
+        if (isCreateFormOpen) {
+            const dateInput = document.getElementById('match-date');
+            if (dateInput) dateInput.focus();
         }
+    }
 
-        const todayStr = new Date().toISOString().split('T')[0];
+    /** Set active matches tab */
+    function setActiveTab(tab) {
+        activeTab = tab;
+        const upcomingTab = document.getElementById('tab-upcoming');
+        const pastTab = document.getElementById('tab-past');
+        if (upcomingTab) upcomingTab.classList.toggle('active', tab === 'upcoming');
+        if (pastTab) pastTab.classList.toggle('active', tab === 'past');
+        renderAdminPanel();
+    }
 
-        listEl.innerHTML = matches.map(match => {
-            const dateObj = new Date((match.date || todayStr) + 'T00:00:00');
-            const dateStr = !isNaN(dateObj.getTime())
-                ? dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                : (match.date || 'TBD');
-            const timeStr = (typeof window !== 'undefined' && window.App && window.App.formatTimeRange)
-                ? window.App.formatTimeRange(match.startTime || match.time, match.endTime)
-                : (match.startTime || match.time || '');
-            const safeTurf = (typeof window !== 'undefined' && window.App && window.App.escapeHtml)
-                ? window.App.escapeHtml(match.turf || '')
-                : (match.turf || '');
-            const safeFormat = (typeof window !== 'undefined' && window.App && window.App.escapeHtml)
-                ? window.App.escapeHtml(match.format || 'Turf Match')
-                : (match.format || 'Turf Match');
-            const playingCount = Array.isArray(match.playing) ? match.playing.length : 0;
-            const waitingCount = Array.isArray(match.waiting) ? match.waiting.length : 0;
-            const maxPlayers = parseInt(match.maxPlayers, 10) || 22;
-            const isPast = match.date && match.date < todayStr;
+    /** Search filter input handler */
+    function handleSearch(query) {
+        matchSearchQuery = (query || '').trim().toLowerCase();
+        renderAdminPanel();
+    }
 
+    /** Render match card HTML */
+    function renderMatchCardHtml(match, isSpotlight = false) {
+        const todayStr = getLocalDateString();
+        const dateObj = new Date((match.date || todayStr) + 'T00:00:00');
+        const dateStr = !isNaN(dateObj.getTime())
+            ? dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+            : (match.date || 'TBD');
+        const timeStr = (typeof window !== 'undefined' && window.App && window.App.formatTimeRange)
+            ? window.App.formatTimeRange(match.startTime || match.time, match.endTime)
+            : (match.startTime || match.time || '');
+        const safeTurf = (typeof window !== 'undefined' && window.App && window.App.escapeHtml)
+            ? window.App.escapeHtml(match.turf || '')
+            : (match.turf || '');
+        const safeFormat = (typeof window !== 'undefined' && window.App && window.App.escapeHtml)
+            ? window.App.escapeHtml(match.format || 'Turf Match')
+            : (match.format || 'Turf Match');
+        const playingCount = Array.isArray(match.playing) ? match.playing.length : 0;
+        const waitingCount = Array.isArray(match.waiting) ? match.waiting.length : 0;
+        const maxPlayers = parseInt(match.maxPlayers, 10) || 22;
+        const isPast = match.date && match.date < todayStr;
+        const fillPercent = Math.min(100, Math.round((playingCount / maxPlayers) * 100));
+
+        if (isSpotlight) {
             return `
-                <div class="admin-match-card ${isPast ? 'is-past' : ''}" data-match-id="${match.id}">
-                    <div class="admin-match-info" onclick="Admin.openMatchSquad('${match.id}')" style="cursor:pointer;">
-                        <div class="admin-match-date">
-                            ${dateStr}
-                            ${isPast ? '<span class="count-tag wait" style="margin-left:6px; font-size:0.65rem;">Past</span>' : ''}
-                        </div>
-                        <div class="admin-match-details">${timeStr} · ${safeTurf} <span class="format-badge-sm">🏏 ${safeFormat}</span></div>
-                        <div class="admin-match-count">
-                            <span class="count-tag in">${playingCount}/${maxPlayers} Playing</span>
-                            <span class="count-tag wait">${waitingCount} Waiting</span>
+                <div class="admin-spotlight-card" data-match-id="${match.id}">
+                    <div class="spotlight-header">
+                        <span class="spotlight-badge">⭐ NEXT UP MATCH</span>
+                        <div class="spotlight-status-tag ${match.locked ? 'locked' : 'open'}">
+                            ${match.locked ? '🔒 Squad Locked' : '🔓 Registration Open'}
                         </div>
                     </div>
-                    <div class="admin-match-actions">
-                        <button class="btn btn-sm btn-outline" title="Manage Squad & Players"
+                    <div class="spotlight-body" onclick="Admin.openMatchSquad('${match.id}')" style="cursor:pointer;">
+                        <h4 class="spotlight-date">${dateStr}</h4>
+                        <div class="spotlight-details">${timeStr} · <strong>${safeTurf}</strong> <span class="format-badge-sm">🏏 ${safeFormat}</span></div>
+                        <div class="spotlight-capacity-wrap">
+                            <div class="spotlight-capacity-bar">
+                                <div class="spotlight-capacity-fill" style="width: ${fillPercent}%;"></div>
+                            </div>
+                            <div class="spotlight-capacity-meta">
+                                <span class="count-tag in"><strong>${playingCount}/${maxPlayers}</strong> Confirmed Players</span>
+                                <span class="count-tag wait">${waitingCount} on Waitlist</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="admin-match-actions spotlight-actions">
+                        <button class="btn btn-sm btn-primary" title="Manage Squad &amp; Players"
                                 onclick="Admin.openMatchSquad('${match.id}')">
-                            👥 Squad
+                            👥 Manage Squad
+                        </button>
+                        <button class="btn btn-sm ${match.locked ? 'btn-danger' : 'btn-outline-gold'}"
+                                onclick="Admin.handleToggleLock('${match.id}')">
+                            ${match.locked ? '🔒 Unlock Squad' : '🔓 Lock Squad'}
+                        </button>
+                        <button class="btn btn-sm btn-outline" title="Open Draft War Room"
+                                onclick="Draft.openDraftRoom('${match.id}')">
+                            ⚔️ War Room
                         </button>
                         <button class="btn btn-sm btn-outline-gold" title="Edit Match Details"
                                 onclick="Admin.openEditModal('${match.id}')">
                             ✏️ Edit
                         </button>
-                        <button class="btn btn-sm ${match.locked ? 'btn-danger' : 'btn-outline'}"
-                                onclick="Admin.handleToggleLock('${match.id}')">
-                            ${match.locked ? '🔒 Locked' : '🔓 Open'}
-                        </button>
-                        <button class="btn btn-sm btn-ghost-danger" title="Delete Match"
-                                onclick="Admin.handleDelete('${match.id}')">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="3 6 5 6 21 6"/>
-                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                            </svg>
-                            <span>Delete</span>
-                        </button>
                     </div>
                 </div>`;
-        }).join('');
+        }
+
+        return `
+            <div class="admin-match-card ${isPast ? 'is-past' : ''}" data-match-id="${match.id}">
+                <div class="admin-match-info" onclick="Admin.openMatchSquad('${match.id}')" style="cursor:pointer;">
+                    <div class="admin-match-date">
+                        ${dateStr}
+                        ${isPast ? '<span class="count-tag wait" style="margin-left:6px; font-size:0.65rem;">Past</span>' : ''}
+                        ${match.locked ? '<span class="count-tag wait" style="margin-left:6px; font-size:0.65rem; background:rgba(239,68,68,0.2); color:#fca5a5;">🔒 Locked</span>' : ''}
+                    </div>
+                    <div class="admin-match-details">${timeStr} · ${safeTurf} <span class="format-badge-sm">🏏 ${safeFormat}</span></div>
+                    <div class="admin-match-count">
+                        <span class="count-tag in">${playingCount}/${maxPlayers} Playing</span>
+                        <span class="count-tag wait">${waitingCount} Waiting</span>
+                    </div>
+                </div>
+                <div class="admin-match-actions">
+                    <button class="btn btn-sm btn-outline" title="Manage Squad &amp; Players"
+                            onclick="Admin.openMatchSquad('${match.id}')">
+                        👥 Squad
+                    </button>
+                    <button class="btn btn-sm btn-outline-gold" title="Edit Match Details"
+                            onclick="Admin.openEditModal('${match.id}')">
+                        ✏️ Edit
+                    </button>
+                    <button class="btn btn-sm ${match.locked ? 'btn-danger' : 'btn-outline'}"
+                            onclick="Admin.handleToggleLock('${match.id}')">
+                        ${match.locked ? '🔒 Locked' : '🔓 Open'}
+                    </button>
+                    <button class="btn btn-sm btn-ghost-danger" title="Delete Match"
+                            onclick="Admin.handleDelete('${match.id}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                        <span>Delete</span>
+                    </button>
+                </div>
+            </div>`;
+    }
+
+    /** Render the admin match management list with smart tabs & spotlight */
+    function renderAdminPanel() {
+        const listEl = document.getElementById('admin-match-list');
+        const spotlightEl = document.getElementById('admin-match-spotlight');
+        if (!listEl) return;
+
+        const allMatches = (typeof Matches !== 'undefined' && Matches.getAll) ? Matches.getAll() : [];
+        const rawList = (Array.isArray(allMatches) ? allMatches : []).filter(m => m && typeof m === 'object');
+        const todayStr = getLocalDateString();
+
+        // 1. Separate Upcoming (closest first) and Past (most recent past first)
+        const upcomingMatches = rawList
+            .filter(m => (m.date || '') >= todayStr)
+            .sort((a, b) => {
+                const dateComp = (a.date || '').localeCompare(b.date || '');
+                if (dateComp !== 0) return dateComp;
+                return (a.startTime || a.time || '').localeCompare(b.startTime || b.time || '');
+            });
+
+        const pastMatches = rawList
+            .filter(m => (m.date || '') < todayStr)
+            .sort((a, b) => {
+                const dateComp = (b.date || '').localeCompare(a.date || ''); // Reverse order
+                if (dateComp !== 0) return dateComp;
+                return (b.startTime || b.time || '').localeCompare(a.startTime || a.time || '');
+            });
+
+        // 2. Update count badges on tabs
+        const upcomingBadge = document.getElementById('upcoming-count-badge');
+        const pastBadge = document.getElementById('past-count-badge');
+        if (upcomingBadge) upcomingBadge.textContent = upcomingMatches.length;
+        if (pastBadge) pastBadge.textContent = pastMatches.length;
+
+        // 3. Filter matches by search query and active tab
+        let currentMatches = (activeTab === 'upcoming') ? upcomingMatches : pastMatches;
+        if (matchSearchQuery) {
+            currentMatches = currentMatches.filter(m => {
+                const turf = (m.turf || '').toLowerCase();
+                const format = (m.format || '').toLowerCase();
+                const date = (m.date || '').toLowerCase();
+                return turf.includes(matchSearchQuery) || format.includes(matchSearchQuery) || date.includes(matchSearchQuery);
+            });
+        }
+
+        // 4. Render Spotlight card for the next immediate match on 'upcoming' tab
+        if (spotlightEl) {
+            if (activeTab === 'upcoming' && !matchSearchQuery && upcomingMatches.length > 0) {
+                const nextMatch = upcomingMatches[0];
+                spotlightEl.innerHTML = renderMatchCardHtml(nextMatch, true);
+                spotlightEl.style.display = 'block';
+            } else {
+                spotlightEl.innerHTML = '';
+                spotlightEl.style.display = 'none';
+            }
+        }
+
+        // 5. Render remaining matches list
+        const displayMatches = (activeTab === 'upcoming' && !matchSearchQuery && upcomingMatches.length > 0)
+            ? currentMatches.slice(1) // Omit the spotlighted one from the standard list below
+            : currentMatches;
+
+        if (displayMatches.length === 0 && (activeTab !== 'upcoming' || upcomingMatches.length === 0)) {
+            const isLiveDb = typeof window !== 'undefined' && window.DB && window.DB.isLive && window.DB.isLive();
+            listEl.innerHTML = `
+                <div class="empty-state-small">
+                    <p>${matchSearchQuery 
+                        ? `No matches found matching "${safeHtml(matchSearchQuery)}".` 
+                        : (activeTab === 'upcoming' 
+                            ? (isLiveDb ? 'No upcoming matches scheduled. Create one above!' : 'No upcoming matches found.') 
+                            : 'No past matches in archive.')}
+                    </p>
+                </div>`;
+            renderPlayersDirectory();
+            return;
+        }
+
+        listEl.innerHTML = displayMatches.map(match => renderMatchCardHtml(match, false)).join('');
 
         // Also refresh player directory
         renderPlayersDirectory();
@@ -163,6 +321,10 @@ const Admin = (() => {
 
         // Set min date to today
         setMinDate();
+
+        // Collapse form & ensure upcoming tab is active so new match is spotlighted/visible
+        toggleCreateForm(false);
+        setActiveTab('upcoming');
 
         renderAdminPanel();
         if (window.App) {
@@ -250,7 +412,7 @@ const Admin = (() => {
     function setMinDate() {
         const dateInput = document.getElementById('match-date');
         if (dateInput) {
-            const today = new Date().toISOString().split('T')[0];
+            const today = getLocalDateString();
             dateInput.setAttribute('min', today);
         }
     }
@@ -327,7 +489,10 @@ const Admin = (() => {
         handleToggleLock,
         handleDelete,
         handleCreateMatch,
-        setMinDate
+        setMinDate,
+        setActiveTab,
+        toggleCreateForm,
+        handleSearch
     };
 })();
 

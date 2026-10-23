@@ -16,6 +16,70 @@ const Draft = (() => {
     let currentMatchId = null;
     let wheelAnimationId = null;
     let poolSearchQuery = '';
+    let turnTimerInterval = null;
+    let turnSecondsRemaining = 60;
+    let currentTrackingPickIndex = -1;
+
+    /** Stop active turn timer */
+    function stopTurnTimer() {
+        if (turnTimerInterval) {
+            clearInterval(turnTimerInterval);
+            turnTimerInterval = null;
+        }
+    }
+
+    /** Start 60s turn countdown with auto-pick fallback */
+    function startTurnTimer(matchId, activeTeamId, expectedPickIndex) {
+        stopTurnTimer();
+
+        if (currentTrackingPickIndex !== expectedPickIndex) {
+            currentTrackingPickIndex = expectedPickIndex;
+            turnSecondsRemaining = 60;
+        }
+
+        const updateTimerDisplay = () => {
+            const countEl = document.getElementById('turn-timer-countdown');
+            const fillEl = document.getElementById('draft-timer-progress-fill');
+            if (countEl) countEl.textContent = `${turnSecondsRemaining}s remaining`;
+            if (fillEl) {
+                const percent = Math.max(0, Math.round((turnSecondsRemaining / 60) * 100));
+                fillEl.style.width = `${percent}%`;
+                fillEl.className = 'draft-timer-progress ' + (turnSecondsRemaining > 20 ? 'green' : (turnSecondsRemaining > 10 ? 'yellow' : 'red'));
+            }
+        };
+
+        updateTimerDisplay();
+
+        turnTimerInterval = setInterval(() => {
+            turnSecondsRemaining--;
+            updateTimerDisplay();
+
+            if (turnSecondsRemaining <= 0) {
+                stopTurnTimer();
+
+                const match = Matches.getById(matchId);
+                if (match && match.draft && match.draft.status === 'in_progress' && match.draft.currentPickIndex === expectedPickIndex) {
+                    const pool = match.draft.unpickedPool || [];
+                    if (pool.length > 0) {
+                        const fallbackPlayerId = pool[0];
+                        const player = Auth.getPlayerById(fallbackPlayerId);
+                        const curUser = Auth.getCurrentUser();
+                        const activeTeam = getActiveTeam(match.draft);
+                        const isMyTurn = activeTeam && activeTeam.captainId === (curUser ? curUser.id : '');
+                        const isAdmin = Auth.isAdmin();
+
+                        // Only the active captain or admin triggers the auto-pick execution
+                        if (isMyTurn || isAdmin) {
+                            if (typeof window.App !== 'undefined' && App.showToast) {
+                                App.showToast(`⏰ Time expired! Auto-picked ${player ? player.name : 'player'} for ${activeTeam ? activeTeam.name : 'team'}`);
+                            }
+                            Draft.executePick(matchId, activeTeamId, fallbackPlayerId);
+                        }
+                    }
+                }
+            }
+        }, 1000);
+    }
 
     /**
      * Safe HTML escaping helper
@@ -662,6 +726,10 @@ const Draft = (() => {
 
         const draft = match.draft;
 
+        if (!draft || draft.status !== 'in_progress') {
+            stopTurnTimer();
+        }
+
         if (!draft) {
             // Need setup
             renderSetupView(match, container);
@@ -847,13 +915,30 @@ const Draft = (() => {
 
     /** 2. TOSS VIEW: 2 Teams (3D Coin Flip) or 3+ Teams (Spin the Wheel) */
     function renderTossView(match, draft, container) {
+        const currentUser = Auth.getCurrentUser();
+        const currentUserId = currentUser ? currentUser.id : '';
         const isAdmin = Auth.isAdmin();
+        const isCaptain = draft.teams.some(t => t.captainId === currentUserId);
+        const canTriggerToss = isAdmin || isCaptain;
+        const myTeam = draft.teams.find(t => t.captainId === currentUserId);
         const isTwoTeams = draft.numTeams === 2;
 
         const team1 = draft.teams[0];
         const team2 = draft.teams[1];
         const cap1 = Auth.getPlayerById(team1.captainId);
         const cap2 = Auth.getPlayerById(team2.captainId);
+
+        const roleBanner = isCaptain
+            ? `<div class="toss-role-banner" style="background:rgba(201,168,76,0.14); border:1px solid rgba(201,168,76,0.35); border-radius:10px; padding:10px 14px; margin-bottom:14px; text-align:center; font-size:0.84rem; color:var(--gold-light);">
+                 👑 <strong>Captain View:</strong> You lead <strong>${safeHtml(myTeam ? myTeam.name : 'your team')}</strong>! You can trigger the toss directly — no admin needed.
+               </div>`
+            : (isAdmin
+                ? `<div class="toss-role-banner" style="background:rgba(52,152,219,0.14); border:1px solid rgba(52,152,219,0.35); border-radius:10px; padding:10px 14px; margin-bottom:14px; text-align:center; font-size:0.84rem; color:#93c5fd;">
+                     🛡️ <strong>Admin View:</strong> Either captain can flip the coin directly on their phones, or you can flip it as admin.
+                   </div>`
+                : `<div class="toss-role-banner" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:10px 14px; margin-bottom:14px; text-align:center; font-size:0.84rem; color:var(--text-muted);">
+                     👀 <strong>Spectator View:</strong> Watching live toss between captains ${safeHtml(cap1 ? cap1.name : 'Team 1')} and ${safeHtml(cap2 ? cap2.name : 'Team 2')}.
+                   </div>`);
 
         let tossHtml = '';
 
@@ -867,6 +952,8 @@ const Draft = (() => {
                         <h2>The Toss for 1st Pick</h2>
                         <p>Flipping the official Challengers Cricket Club golden coin to decide who picks first.</p>
                     </div>
+
+                    ${roleBanner}
 
                     <div class="toss-coin-stage">
                         <div class="ccc-coin" id="ccc-coin">
@@ -904,12 +991,12 @@ const Draft = (() => {
                     <div id="toss-result-box" class="toss-result-box" style="display:none;"></div>
 
                     <div class="toss-actions">
-                        ${isAdmin ? `
+                        ${canTriggerToss ? `
                             <button type="button" id="flip-coin-btn" class="btn btn-gold btn-lg" onclick="Draft.handleCoinFlip('${match.id}')">
                                 <span>🪙 Flip CCC Coin</span>
                             </button>
                         ` : `
-                            <p class="toss-waiting-text">Waiting for Admin to flip the CCC coin...</p>
+                            <p class="toss-waiting-text">Waiting for Captains (${safeHtml(cap1 ? cap1.name.split(' ')[0] : 'Cap 1')} or ${safeHtml(cap2 ? cap2.name.split(' ')[0] : 'Cap 2')}) to flip the CCC coin...</p>
                         `}
                         <button type="button" id="enter-war-room-btn" class="btn btn-primary btn-lg" style="display:none;" onclick="Draft.enterWarRoom('${match.id}')">
                             <span>Enter War Room ➔</span>
@@ -926,6 +1013,8 @@ const Draft = (() => {
                         <h2>CCC Spin the Wheel</h2>
                         <p>Spinning the official CCC Fortune Wheel to determine the 1st pick for the ${draft.numTeams} captains!</p>
                     </div>
+
+                    ${roleBanner}
 
                     <div class="wheel-stage-wrap">
                         <div class="wheel-pointer" id="wheel-pointer">▼</div>
@@ -951,12 +1040,12 @@ const Draft = (() => {
                     <div id="toss-result-box" class="toss-result-box" style="display:none;"></div>
 
                     <div class="toss-actions">
-                        ${isAdmin ? `
+                        ${canTriggerToss ? `
                             <button type="button" id="spin-wheel-btn" class="btn btn-gold btn-lg" onclick="Draft.handleWheelSpin('${match.id}')">
                                 <span>🎡 Spin the Wheel</span>
                             </button>
                         ` : `
-                            <p class="toss-waiting-text">Waiting for Admin to spin the wheel...</p>
+                            <p class="toss-waiting-text">Waiting for Captains or Admin to spin the wheel...</p>
                         `}
                         <button type="button" id="enter-war-room-btn" class="btn btn-primary btn-lg" style="display:none;" onclick="Draft.enterWarRoom('${match.id}')">
                             <span>Enter War Room ➔</span>
@@ -1016,7 +1105,20 @@ const Draft = (() => {
             }
 
             if (flipBtn) flipBtn.style.display = 'none';
-            if (enterBtn) enterBtn.style.display = 'inline-flex';
+            if (enterBtn) {
+                enterBtn.style.display = 'inline-flex';
+                let secsLeft = 3;
+                enterBtn.innerHTML = `<span>Entering War Room in ${secsLeft}s ➔</span>`;
+                const autoCountdownId = setInterval(() => {
+                    secsLeft--;
+                    if (secsLeft > 0) {
+                        if (enterBtn) enterBtn.innerHTML = `<span>Entering War Room in ${secsLeft}s ➔</span>`;
+                    } else {
+                        clearInterval(autoCountdownId);
+                        Draft.enterWarRoom(matchId);
+                    }
+                }, 1000);
+            }
         }, 2600);
     }
 
@@ -1130,7 +1232,20 @@ const Draft = (() => {
                 }
 
                 if (spinBtn) spinBtn.style.display = 'none';
-                if (enterBtn) enterBtn.style.display = 'inline-flex';
+                if (enterBtn) {
+                    enterBtn.style.display = 'inline-flex';
+                    let secsLeft = 3;
+                    enterBtn.innerHTML = `<span>Entering War Room in ${secsLeft}s ➔</span>`;
+                    const autoCountdownId = setInterval(() => {
+                        secsLeft--;
+                        if (secsLeft > 0) {
+                            if (enterBtn) enterBtn.innerHTML = `<span>Entering War Room in ${secsLeft}s ➔</span>`;
+                        } else {
+                            clearInterval(autoCountdownId);
+                            Draft.enterWarRoom(matchId);
+                        }
+                    }, 1000);
+                }
             }
         }
 
@@ -1303,6 +1418,17 @@ const Draft = (() => {
                     </div>
                 </div>
 
+                <!-- 60-Second Pick Countdown Timer -->
+                <div class="draft-turn-timer-wrap">
+                    <div class="draft-turn-timer-header">
+                        <span>⏱️ Pick Clock: <strong>${activeCap ? safeHtml(activeCap.name.split(' ')[0]) : 'Captain'}</strong> (${safeHtml(activeTeam ? activeTeam.name : 'Team')})</span>
+                        <span id="turn-timer-countdown">${turnSecondsRemaining}s remaining</span>
+                    </div>
+                    <div class="draft-timer-bar">
+                        <div id="draft-timer-progress-fill" class="draft-timer-progress green" style="width: 100%;"></div>
+                    </div>
+                </div>
+
                 <!-- Latest Pick Marquee / Undo Strip -->
                 ${latestPickHtml}
 
@@ -1375,6 +1501,8 @@ const Draft = (() => {
                     </div>
                 ` : ''}
             </div>`;
+
+        startTurnTimer(match.id, activeTeam ? activeTeam.id : '', draft.currentPickIndex);
     }
 
     /** Live search input handler */
@@ -1389,6 +1517,7 @@ const Draft = (() => {
 
     /** Execute Draft Pick */
     async function executePick(matchId, teamId, playerId) {
+        stopTurnTimer();
         const match = Matches.getById(matchId);
         if (!match || !match.draft) return;
 
@@ -1407,6 +1536,7 @@ const Draft = (() => {
 
     /** Handle Undo Last Pick */
     async function handleUndoPick(matchId) {
+        stopTurnTimer();
         const match = Matches.getById(matchId);
         if (!match || !match.draft) return;
 
@@ -1461,6 +1591,7 @@ const Draft = (() => {
 
     /** 4. COMPLETED VIEW: Confetti, Final Rosters, Copy for WhatsApp & Admin Tools */
     function renderCompletedView(match, draft, container) {
+        stopTurnTimer();
         const isAdmin = Auth.isAdmin();
         SoundFX.playFanfare();
         setTimeout(() => launchConfetti(), 150);
@@ -1761,7 +1892,9 @@ const Draft = (() => {
         toggleSound,
         isSoundEnabled,
         launchConfetti,
-        SoundFX
+        SoundFX,
+        startTurnTimer,
+        stopTurnTimer
     };
 })();
 

@@ -232,6 +232,9 @@ const DB = (() => {
             if (Array.isArray(data)) {
                 const players = data.map(dbToPlayer);
                 localStorage.setItem('ccc_players', JSON.stringify(players));
+                if (typeof Auth !== 'undefined' && Auth.deduplicatePlayersAndMatches) {
+                    Auth.deduplicatePlayersAndMatches();
+                }
             }
         } catch (err) {
             console.warn('Error syncing players from Supabase:', err);
@@ -314,6 +317,22 @@ const DB = (() => {
        SQUAD ACTIONS (JOIN, LEAVE, PROMOTE, REMOVE, LOCK)
     ---------------------------------------------------------- */
 
+    /** Check if player (by ID or mobile) is already present in a squad list */
+    function isPlayerInList(list, playerId) {
+        if (!Array.isArray(list) || !playerId) return false;
+        if (list.includes(playerId)) return true;
+
+        const candidate = (typeof Auth !== 'undefined' && Auth.getPlayerById) ? Auth.getPlayerById(playerId) : null;
+        const candPhone = candidate && Auth.normalizePhone ? Auth.normalizePhone(candidate.mobile) : '';
+        if (!candPhone) return false;
+
+        return list.some(id => {
+            if (id === playerId) return true;
+            const p = (typeof Auth !== 'undefined' && Auth.getPlayerById) ? Auth.getPlayerById(id) : null;
+            return p && Auth.normalizePhone && Auth.normalizePhone(p.mobile) === candPhone;
+        });
+    }
+
     /** Join a match */
     async function joinMatch(matchId, playerId) {
         if (!isLive()) {
@@ -340,10 +359,10 @@ const DB = (() => {
             const waiting = match.waiting || [];
             const maxPlayers = match.maxPlayers || 22;
 
-            if (playing.includes(playerId)) {
+            if (isPlayerInList(playing, playerId)) {
                 return { success: false, message: "You're already in the playing squad" };
             }
-            if (waiting.includes(playerId)) {
+            if (isPlayerInList(waiting, playerId)) {
                 return { success: false, message: "You're already on the waiting list" };
             }
 
@@ -403,15 +422,25 @@ const DB = (() => {
             let waiting = match.waiting || [];
             const maxPlayers = match.maxPlayers || 22;
 
-            const wasPlaying = playing.includes(playerId);
-            const wasWaiting = waiting.includes(playerId);
+            const candidate = Auth.getPlayerById(playerId);
+            const candPhone = candidate && Auth.normalizePhone ? Auth.normalizePhone(candidate.mobile) : '';
+
+            const matchesPlayer = (id) => {
+                if (id === playerId) return true;
+                if (!candPhone) return false;
+                const p = Auth.getPlayerById(id);
+                return p && Auth.normalizePhone && Auth.normalizePhone(p.mobile) === candPhone;
+            };
+
+            const wasPlaying = playing.some(matchesPlayer);
+            const wasWaiting = waiting.some(matchesPlayer);
 
             if (!wasPlaying && !wasWaiting) {
                 return { success: false, message: 'You are not in this match' };
             }
 
-            playing = playing.filter(id => id !== playerId);
-            waiting = waiting.filter(id => id !== playerId);
+            playing = playing.filter(id => !matchesPlayer(id));
+            waiting = waiting.filter(id => !matchesPlayer(id));
 
             let promoted = null;
             if (wasPlaying && playing.length < maxPlayers && waiting.length > 0) {
@@ -460,10 +489,10 @@ const DB = (() => {
                     let playing = match.playing || [];
                     let waiting = match.waiting || [];
 
-                    if (playing.includes(playerId)) {
+                    if (isPlayerInList(playing, playerId)) {
                         return { success: false, message: `${player.name} is already in the playing squad` };
                     }
-                    if (waiting.includes(playerId)) {
+                    if (isPlayerInList(waiting, playerId)) {
                         return { success: false, message: `${player.name} is already on the waiting list` };
                     }
 
@@ -511,15 +540,25 @@ const DB = (() => {
                 let waiting = match.waiting || [];
                 const maxPlayers = match.maxPlayers || 22;
 
-                const wasPlaying = playing.includes(playerId);
-                const wasWaiting = waiting.includes(playerId);
+                const candidate = Auth.getPlayerById(playerId);
+                const candPhone = candidate && Auth.normalizePhone ? Auth.normalizePhone(candidate.mobile) : '';
+
+                const matchesPlayer = (id) => {
+                    if (id === playerId) return true;
+                    if (!candPhone) return false;
+                    const p = Auth.getPlayerById(id);
+                    return p && Auth.normalizePhone && Auth.normalizePhone(p.mobile) === candPhone;
+                };
+
+                const wasPlaying = playing.some(matchesPlayer);
+                const wasWaiting = waiting.some(matchesPlayer);
 
                 if (!wasPlaying && !wasWaiting) {
                     return { success: false, message: 'Player is not in this match' };
                 }
 
-                playing = playing.filter(id => id !== playerId);
-                waiting = waiting.filter(id => id !== playerId);
+                playing = playing.filter(id => !matchesPlayer(id));
+                waiting = waiting.filter(id => !matchesPlayer(id));
 
                 let promoted = null;
                 if (wasPlaying && playing.length < maxPlayers && waiting.length > 0) {

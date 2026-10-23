@@ -170,13 +170,18 @@
                 <div style="width:40px;"></div>
             </header>
             <div class="admin-content" id="admin-content">
-                <!-- Create Match Form -->
-                <div class="admin-section">
-                    <h3 class="section-title-icon">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                        Create New Match
-                    </h3>
-                    <form id="create-match-form" class="admin-form">
+                <!-- Create Match Form (Collapsible to save vertical screen space) -->
+                <div class="admin-section collapsible-section" id="admin-create-section">
+                    <div class="admin-section-header-toggle" onclick="Admin.toggleCreateForm()" style="cursor:pointer;">
+                        <h3 class="section-title-icon" style="margin:0;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            Create New Match
+                        </h3>
+                        <button type="button" class="btn btn-xs btn-outline-gold" id="toggle-create-form-btn">
+                            <span id="create-toggle-icon">+</span> <span id="create-toggle-label">New Match</span>
+                        </button>
+                    </div>
+                    <form id="create-match-form" class="admin-form" style="display:none; margin-top:14px;">
                         <div class="form-row">
                             <div class="input-group">
                                 <label for="match-date">Date</label>
@@ -212,12 +217,36 @@
                     </form>
                 </div>
 
-                <!-- Manage Matches -->
+                <!-- Manage Matches (Tabs, Search, Spotlight & Chronological List) -->
                 <div class="admin-section">
-                    <h3 class="section-title-icon">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        Manage Matches
-                    </h3>
+                    <div class="admin-matches-header-wrap">
+                        <h3 class="section-title-icon" style="margin:0;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            Manage Matches
+                        </h3>
+                    </div>
+
+                    <!-- Tabs & Search Controls -->
+                    <div class="admin-match-controls">
+                        <div class="admin-tabs" id="admin-match-tabs">
+                            <button type="button" class="admin-tab active" id="tab-upcoming" onclick="Admin.setActiveTab('upcoming')">
+                                <span>⚡ Upcoming &amp; Active</span>
+                                <span class="tab-badge" id="upcoming-count-badge">0</span>
+                            </button>
+                            <button type="button" class="admin-tab" id="tab-past" onclick="Admin.setActiveTab('past')">
+                                <span>📁 Past Archive</span>
+                                <span class="tab-badge" id="past-count-badge">0</span>
+                            </button>
+                        </div>
+                        <div class="admin-search-wrap">
+                            <input type="text" id="admin-match-search" class="admin-search-input" placeholder="🔍 Search turf, format, or date..." oninput="Admin.handleSearch(this.value)">
+                        </div>
+                    </div>
+
+                    <!-- Pinned Spotlight Card for Next Immediate Match -->
+                    <div id="admin-match-spotlight" style="display:none; margin-bottom:14px;"></div>
+
+                    <!-- Matches List -->
                     <div id="admin-match-list" class="admin-match-list"></div>
                 </div>
 

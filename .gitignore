@@ -2,4 +2,5 @@
 capture.html
 site.zip
 screenshots/
+generate_screenshots.js
 *.log

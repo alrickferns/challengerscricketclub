@@ -3,6 +3,22 @@
    ============================================================ */
 const Squad = (() => {
 
+    /** Check if player (by ID or mobile) is already present in a squad list */
+    function isPlayerInList(list, playerId) {
+        if (!Array.isArray(list) || !playerId) return false;
+        if (list.includes(playerId)) return true;
+
+        const candidate = Auth.getPlayerById(playerId);
+        const candPhone = candidate && Auth.normalizePhone ? Auth.normalizePhone(candidate.mobile) : '';
+        if (!candPhone) return false;
+
+        return list.some(id => {
+            if (id === playerId) return true;
+            const p = Auth.getPlayerById(id);
+            return p && Auth.normalizePhone && Auth.normalizePhone(p.mobile) === candPhone;
+        });
+    }
+
     /**
      * Join a match (playing or waitlist).
      * Returns { success, message, status }
@@ -12,11 +28,11 @@ const Squad = (() => {
         if (!match) return { success: false, message: 'Match not found' };
         if (match.locked) return { success: false, message: 'Squad is locked by admin' };
 
-        // Already in?
-        if (match.playing.includes(playerId)) {
+        // Already in? (Guards against duplicate IDs and duplicate phone numbers)
+        if (isPlayerInList(match.playing, playerId)) {
             return { success: false, message: 'You\'re already in the playing squad' };
         }
-        if (match.waiting.includes(playerId)) {
+        if (isPlayerInList(match.waiting, playerId)) {
             return { success: false, message: 'You\'re already on the waiting list' };
         }
 
@@ -44,16 +60,26 @@ const Squad = (() => {
         if (!match) return { success: false, message: 'Match not found' };
         if (match.locked) return { success: false, message: 'Squad is locked — contact admin' };
 
-        const wasPlaying = match.playing.includes(playerId);
-        const wasWaiting = match.waiting.includes(playerId);
+        const candidate = Auth.getPlayerById(playerId);
+        const candPhone = candidate && Auth.normalizePhone ? Auth.normalizePhone(candidate.mobile) : '';
+
+        const matchesPlayer = (id) => {
+            if (id === playerId) return true;
+            if (!candPhone) return false;
+            const p = Auth.getPlayerById(id);
+            return p && Auth.normalizePhone && Auth.normalizePhone(p.mobile) === candPhone;
+        };
+
+        const wasPlaying = match.playing.some(matchesPlayer);
+        const wasWaiting = match.waiting.some(matchesPlayer);
 
         if (!wasPlaying && !wasWaiting) {
             return { success: false, message: 'You are not in this match' };
         }
 
         // Remove from playing or waiting
-        match.playing = match.playing.filter(id => id !== playerId);
-        match.waiting = match.waiting.filter(id => id !== playerId);
+        match.playing = match.playing.filter(id => !matchesPlayer(id));
+        match.waiting = match.waiting.filter(id => !matchesPlayer(id));
 
         let promoted = null;
         const maxCap = match.maxPlayers || 22;
@@ -80,9 +106,18 @@ const Squad = (() => {
         const match = Matches.getById(matchId);
         if (!match) return 'none';
 
-        if (match.playing.includes(playerId)) return 'playing';
+        if (isPlayerInList(match.playing, playerId)) return 'playing';
 
-        const waitIdx = match.waiting.indexOf(playerId);
+        const candidate = Auth.getPlayerById(playerId);
+        const candPhone = candidate && Auth.normalizePhone ? Auth.normalizePhone(candidate.mobile) : '';
+
+        const waitIdx = match.waiting.findIndex(id => {
+            if (id === playerId) return true;
+            if (!candPhone) return false;
+            const p = Auth.getPlayerById(id);
+            return p && Auth.normalizePhone && Auth.normalizePhone(p.mobile) === candPhone;
+        });
+
         if (waitIdx !== -1) return 'waiting:' + (waitIdx + 1);
 
         return 'none';
@@ -118,10 +153,10 @@ const Squad = (() => {
         const player = Auth.getOrCreateGuestPlayer(name, mobile);
         const playerId = player.id;
 
-        if (match.playing.includes(playerId)) {
+        if (isPlayerInList(match.playing, playerId)) {
             return { success: false, message: `${player.name} is already in the playing squad` };
         }
-        if (match.waiting.includes(playerId)) {
+        if (isPlayerInList(match.waiting, playerId)) {
             return { success: false, message: `${player.name} is already on the waiting list` };
         }
 
@@ -178,24 +213,28 @@ const Squad = (() => {
         const match = Matches.getById(matchId);
         if (!match) return { success: false, message: 'Match not found' };
 
-        let playing = [...match.playing];
-        let waiting = [...match.waiting];
+        const candidate = Auth.getPlayerById(playerId);
+        const candPhone = candidate && Auth.normalizePhone ? Auth.normalizePhone(candidate.mobile) : '';
+
+        const matchesPlayer = (id) => {
+            if (id === playerId) return true;
+            if (!candPhone) return false;
+            const p = Auth.getPlayerById(id);
+            return p && Auth.normalizePhone && Auth.normalizePhone(p.mobile) === candPhone;
+        };
+
+        let playing = (match.playing || []).filter(id => !matchesPlayer(id));
+        let waiting = (match.waiting || []).filter(id => !matchesPlayer(id));
 
         const player = typeof Auth !== 'undefined' ? Auth.getPlayerById(playerId) : null;
         const name = player ? player.name : 'Player';
 
         if (targetList === 'playing') {
-            waiting = waiting.filter(id => id !== playerId);
-            if (!playing.includes(playerId)) {
-                playing.push(playerId);
-            }
+            playing.push(playerId);
             Matches.update(matchId, { playing, waiting });
             return { success: true, message: `Moved ${name} to Playing Squad! 🏏`, match: Matches.getById(matchId) };
         } else {
-            playing = playing.filter(id => id !== playerId);
-            if (!waiting.includes(playerId)) {
-                waiting.push(playerId);
-            }
+            waiting.push(playerId);
             Matches.update(matchId, { playing, waiting });
             return { success: true, message: `Moved ${name} to Waiting List! ⏳`, match: Matches.getById(matchId) };
         }

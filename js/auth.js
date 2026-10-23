@@ -7,6 +7,22 @@ const Auth = (() => {
     const ADMIN_PASSCODE = 'CCC2025';
     const ADMIN_PENDING_KEY = 'ccc_admin_pending';
 
+    /** Canonical 10-digit phone normalization */
+    function normalizePhone(mobile) {
+        if (!mobile) return '';
+        const digits = String(mobile).replace(/\D/g, '');
+        if (digits.length >= 10) {
+            return digits.slice(-10);
+        }
+        return digits;
+    }
+
+    /** Deterministic player ID from phone number */
+    function getPlayerIdForPhone(mobile) {
+        const clean = normalizePhone(mobile);
+        return clean ? `p_${clean}` : `player_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    }
+
     /** Safe JSON parse helper to guard against storage corruption */
     function safeJsonParse(str, fallback) {
         try {
@@ -32,23 +48,33 @@ const Auth = (() => {
         return safeJsonParse(localStorage.getItem(CURRENT_USER_KEY), null);
     }
 
-    /** Log in with name + mobile. Auto-registers new players. */
+    /** Log in with name + mobile. Uses phone as identifying factor without creating duplicates. */
     function login(name, mobile) {
         const cleanName = (name || '').trim();
-        const cleanMobile = (mobile || '').replace(/\D/g, '');
+        const cleanMobile = normalizePhone(mobile);
         const players = getPlayers();
-        let player = players.find(p => p.mobile === cleanMobile);
+        
+        // Find existing by normalized mobile (primary) or deterministic ID
+        const targetId = getPlayerIdForPhone(cleanMobile);
+        let player = players.find(p => {
+            const pPhone = normalizePhone(p.mobile);
+            return (cleanMobile && pPhone === cleanMobile) || p.id === targetId;
+        });
+
         const isPendingAdmin = sessionStorage.getItem(ADMIN_PENDING_KEY) === 'true';
 
         if (player) {
-            // Returning player — update name if changed
-            player.name = cleanName;
+            // Returning player — update name to full name if provided, ensure canonical ID and phone
+            if (cleanName && cleanName.length >= (player.name || '').length) {
+                player.name = cleanName;
+            }
+            player.mobile = cleanMobile;
             if (isPendingAdmin) player.isAdmin = true;
             savePlayers(players);
         } else {
-            // New player — auto-register
+            // New player — auto-register with deterministic ID
             player = {
-                id: 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                id: targetId,
                 name: cleanName,
                 mobile: cleanMobile,
                 isAdmin: isPendingAdmin,
@@ -68,6 +94,9 @@ const Auth = (() => {
         if (typeof window !== 'undefined' && window.DB && DB.isLive()) {
             DB.savePlayer(player).catch(err => console.warn('Could not sync player to cloud:', err));
         }
+
+        // Run deduplication to clean up any past duplicate entries
+        deduplicatePlayersAndMatches();
 
         return player;
     }
@@ -114,24 +143,45 @@ const Auth = (() => {
         }
     }
 
-    /** Look up a player by ID */
+    /** Look up a player by ID (also checks phone match fallback) */
     function getPlayerById(id) {
-        return getPlayers().find(p => p.id === id) || null;
+        if (!id) return null;
+        const players = getPlayers();
+        const byId = players.find(p => p.id === id);
+        if (byId) return byId;
+
+        // Fallback: if id is 'p_<phone>'
+        if (id.startsWith('p_')) {
+            const phone = id.slice(2);
+            return players.find(p => normalizePhone(p.mobile) === phone) || null;
+        }
+        return null;
     }
 
     /** Find or create a player record for admin manual additions */
     function getOrCreateGuestPlayer(name, mobile) {
         const players = getPlayers();
-        const trimmedName = name.trim();
-        const cleanMobile = (mobile || '').replace(/\D/g, '');
+        const trimmedName = (name || '').trim();
+        const cleanMobile = normalizePhone(mobile);
 
         if (cleanMobile) {
-            const existing = players.find(p => p.mobile === cleanMobile);
-            if (existing) return existing;
+            const targetId = getPlayerIdForPhone(cleanMobile);
+            const existing = players.find(p => normalizePhone(p.mobile) === cleanMobile || p.id === targetId);
+            if (existing) {
+                // Update to longer/better name if provided
+                if (trimmedName && trimmedName.length > (existing.name || '').length) {
+                    existing.name = trimmedName;
+                    savePlayers(players);
+                    if (typeof window !== 'undefined' && window.DB && DB.isLive()) {
+                        DB.savePlayer(existing).catch(() => {});
+                    }
+                }
+                return existing;
+            }
         }
 
         const newPlayer = {
-            id: 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            id: getPlayerIdForPhone(cleanMobile),
             name: trimmedName,
             mobile: cleanMobile,
             isAdmin: false,
@@ -148,6 +198,131 @@ const Auth = (() => {
         return newPlayer;
     }
 
+    /**
+     * Deduplicate players and match squads:
+     * Identifies duplicate player entries with the same mobile number,
+     * merges them to canonical ID (p_<mobile>), and updates all match squad rosters.
+     */
+    function deduplicatePlayersAndMatches() {
+        try {
+            const players = getPlayers();
+            if (!Array.isArray(players) || players.length === 0) return;
+
+            const phoneMap = new Map(); // normalizedPhone -> canonical player
+            const idRedirectMap = {};   // oldId -> canonicalId
+            let playersChanged = false;
+
+            // 1. Find all duplicates by phone number
+            players.forEach(p => {
+                const phone = normalizePhone(p.mobile);
+                if (!phone) return;
+
+                if (!phoneMap.has(phone)) {
+                    // Normalize to deterministic ID if possible
+                    const canonicalId = `p_${phone}`;
+                    if (p.id !== canonicalId) {
+                        idRedirectMap[p.id] = canonicalId;
+                        p.id = canonicalId;
+                        playersChanged = true;
+                    }
+                    phoneMap.set(phone, p);
+                } else {
+                    // Duplicate found! Merge into canonical
+                    const canonical = phoneMap.get(phone);
+                    idRedirectMap[p.id] = canonical.id;
+                    // Prefer longer/fuller name
+                    if ((p.name || '').trim().length > (canonical.name || '').trim().length) {
+                        canonical.name = p.name.trim();
+                    }
+                    if (p.isAdmin) canonical.isAdmin = true;
+                    playersChanged = true;
+                }
+            });
+
+            if (playersChanged || Object.keys(idRedirectMap).length > 0) {
+                // Reconstruct unique players list
+                const seenIds = new Set();
+                const dedupedPlayers = [];
+                players.forEach(p => {
+                    const phone = normalizePhone(p.mobile);
+                    const target = phone ? phoneMap.get(phone) : p;
+                    if (target && !seenIds.has(target.id)) {
+                        seenIds.add(target.id);
+                        dedupedPlayers.push(target);
+                    }
+                });
+                savePlayers(dedupedPlayers);
+
+                // Update current user if redirected
+                const curUser = getCurrentUser();
+                if (curUser) {
+                    const curPhone = normalizePhone(curUser.mobile);
+                    if (curPhone && phoneMap.has(curPhone)) {
+                        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(phoneMap.get(curPhone)));
+                    } else if (idRedirectMap[curUser.id]) {
+                        curUser.id = idRedirectMap[curUser.id];
+                        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(curUser));
+                    }
+                }
+
+                // Clean match squads
+                if (typeof window !== 'undefined' && window.Matches && Matches.getAll) {
+                    const matches = Matches.getAll();
+                    let matchesChanged = false;
+
+                    matches.forEach(m => {
+                        let mChanged = false;
+                        const cleanList = (list) => {
+                            if (!Array.isArray(list)) return [];
+                            const seen = new Set();
+                            const seenPhones = new Set();
+                            const result = [];
+
+                            list.forEach(id => {
+                                const canonicalId = idRedirectMap[id] || id;
+                                const player = dedupedPlayers.find(dp => dp.id === canonicalId);
+                                const phone = player ? normalizePhone(player.mobile) : '';
+
+                                if (seen.has(canonicalId)) {
+                                    mChanged = true;
+                                    return;
+                                }
+                                if (phone && seenPhones.has(phone)) {
+                                    mChanged = true;
+                                    return;
+                                }
+
+                                seen.add(canonicalId);
+                                if (phone) seenPhones.add(phone);
+                                result.push(canonicalId);
+                                if (canonicalId !== id) mChanged = true;
+                            });
+                            return result;
+                        };
+
+                        const newPlaying = cleanList(m.playing);
+                        const newWaiting = cleanList(m.waiting).filter(wid => !newPlaying.includes(wid));
+
+                        if (mChanged || newPlaying.length !== (m.playing || []).length || newWaiting.length !== (m.waiting || []).length) {
+                            m.playing = newPlaying;
+                            m.waiting = newWaiting;
+                            matchesChanged = true;
+                            if (typeof window !== 'undefined' && window.DB && DB.isLive()) {
+                                DB.saveMatch(m).catch(() => {});
+                            }
+                        }
+                    });
+
+                    if (matchesChanged) {
+                        Matches.save(matches);
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('Deduplication check error:', err);
+        }
+    }
+
     return {
         getPlayers,
         getCurrentUser,
@@ -158,7 +333,10 @@ const Auth = (() => {
         setPendingAdmin,
         grantAdmin,
         getPlayerById,
-        getOrCreateGuestPlayer
+        getOrCreateGuestPlayer,
+        normalizePhone,
+        getPlayerIdForPhone,
+        deduplicatePlayersAndMatches
     };
 })();
 
