@@ -265,60 +265,8 @@ const Auth = (() => {
                     }
                 }
 
-                // Clean match squads
-                if (typeof window !== 'undefined' && window.Matches && Matches.getAll) {
-                    const matches = Matches.getAll();
-                    let matchesChanged = false;
-
-                    matches.forEach(m => {
-                        // Never alter squad rosters of locked matches
-                        if (m.locked) return;
-                        let mChanged = false;
-                        const cleanList = (list) => {
-                            if (!Array.isArray(list)) return [];
-                            const seen = new Set();
-                            const seenPhones = new Set();
-                            const result = [];
-
-                            list.forEach(id => {
-                                const canonicalId = idRedirectMap[id] || id;
-                                const player = dedupedPlayers.find(dp => dp.id === canonicalId);
-                                const phone = player ? normalizePhone(player.mobile) : '';
-
-                                if (seen.has(canonicalId)) {
-                                    mChanged = true;
-                                    return;
-                                }
-                                if (phone && seenPhones.has(phone)) {
-                                    mChanged = true;
-                                    return;
-                                }
-
-                                seen.add(canonicalId);
-                                if (phone) seenPhones.add(phone);
-                                result.push(canonicalId);
-                                if (canonicalId !== id) mChanged = true;
-                            });
-                            return result;
-                        };
-
-                        const newPlaying = cleanList(m.playing);
-                        const newWaiting = cleanList(m.waiting).filter(wid => !newPlaying.includes(wid));
-
-                        if (mChanged || newPlaying.length !== (m.playing || []).length || newWaiting.length !== (m.waiting || []).length) {
-                            m.playing = newPlaying;
-                            m.waiting = newWaiting;
-                            matchesChanged = true;
-                            if (typeof window !== 'undefined' && window.DB && DB.isLive()) {
-                                DB.saveMatch(m).catch(() => {});
-                            }
-                        }
-                    });
-
-                    if (matchesChanged) {
-                        Matches.save(matches);
-                    }
-                }
+                // Note: Never mutate or truncate match squad rosters in background deduplication.
+                // Admin and players manage match rosters directly via Supabase.
             }
         } catch (err) {
             console.warn('Deduplication check error:', err);
