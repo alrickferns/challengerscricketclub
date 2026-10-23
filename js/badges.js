@@ -90,7 +90,8 @@ const Badges = (() => {
 
     /**
      * Calculate total confirmed matches played by a player.
-     * Uses canonical phone matching to catch legacy IDs as well.
+     * Checks playing squad as well as drafted team rosters,
+     * matching by both ID and canonical 10-digit mobile number.
      */
     function getPlayerMatchCount(playerId) {
         if (!playerId || typeof Matches === 'undefined' || !Matches.getAll) return 0;
@@ -100,6 +101,7 @@ const Badges = (() => {
         const todayStr = getTodayStr();
 
         const matchesPlayer = (id) => {
+            if (!id) return false;
             if (id === playerId) return true;
             if (!targetPhone) return false;
             const p = Auth.getPlayerById(id);
@@ -109,9 +111,35 @@ const Badges = (() => {
         let count = 0;
         for (const m of allMatches) {
             if (!m) continue;
-            // Counts past matches or locked matches where player was in playing squad
-            const isPast = (m.date && m.date < todayStr) || m.locked === true;
-            if (isPast && Array.isArray(m.playing) && m.playing.some(matchesPlayer)) {
+
+            // Match is counted if:
+            // 1. Date is in the past (completed game), OR
+            // 2. Match was locked by admin (confirmed lineup), OR
+            // 3. Draft was conducted/completed for this match
+            const isPlayedMatch = (m.date && m.date < todayStr) || 
+                                  Boolean(m.locked) || 
+                                  Boolean(m.draft && (m.draft.status === 'completed' || m.draft.status === 'in_progress'));
+
+            if (!isPlayedMatch) continue;
+
+            let playedInThisMatch = false;
+
+            // Check if player was in confirmed playing squad
+            if (Array.isArray(m.playing) && m.playing.some(matchesPlayer)) {
+                playedInThisMatch = true;
+            }
+
+            // Also check if player was drafted into any team roster
+            if (!playedInThisMatch && m.draft && Array.isArray(m.draft.teams)) {
+                for (const t of m.draft.teams) {
+                    if (Array.isArray(t.players) && t.players.some(matchesPlayer)) {
+                        playedInThisMatch = true;
+                        break;
+                    }
+                }
+            }
+
+            if (playedInThisMatch) {
                 count++;
             }
         }
@@ -128,6 +156,7 @@ const Badges = (() => {
         const allMatches = Matches.getAll() || [];
 
         const matchesPlayer = (id) => {
+            if (!id) return false;
             if (id === playerId) return true;
             if (!targetPhone) return false;
             const p = Auth.getPlayerById(id);
