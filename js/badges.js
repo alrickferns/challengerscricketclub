@@ -46,14 +46,14 @@ const Badges = (() => {
             desc: 'Weekend Regular (5+ Matches)'
         },
         {
-            threshold: 1,
+            threshold: 0,
             id: 'debutant',
             icon: '🧢',
             title: 'Debutant',
             color: '#f1c40f',
             bg: 'rgba(241, 196, 15, 0.16)',
             border: 'rgba(241, 196, 15, 0.45)',
-            desc: 'CCC Cap (1+ Match)'
+            desc: 'CCC Cap (0 - 4 Matches)'
         }
     ];
 
@@ -241,10 +241,11 @@ const Badges = (() => {
 
         if (status.currentMilestone) {
             const m = status.currentMilestone;
+            const capText = status.matchesCount === 0 ? 'Debut Match' : `${status.matchesCount} Caps`;
             html += `
                 <span class="player-badge-pill milestone-pill" 
                       style="color:${m.color}; background:${m.bg}; border-color:${m.border};" 
-                      title="${safeHtml(m.title)}: ${m.threshold}+ Matches (${status.matchesCount} Caps)"
+                      title="${safeHtml(m.title)} (${capText})"
                       onclick="Badges.openPassportModal('${safeHtml(playerId)}', event)">
                     <span class="badge-icon">${m.icon}</span>
                     <span class="badge-label">${safeHtml(m.title)}</span>
