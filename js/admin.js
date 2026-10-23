@@ -454,8 +454,9 @@ const Admin = (() => {
                     <div class="admin-player-info">
                         <div class="player-avatar-badge" style="width:34px; height:34px; font-size:0.75rem;">${initials}</div>
                         <div class="admin-player-details">
-                            <div class="admin-player-name">
+                            <div class="admin-player-name" onclick="Badges.openPassportModal('${p.id}', event)" style="cursor:pointer;" title="View Player Passport">
                                 ${safeName}
+                                ${(typeof Badges !== 'undefined') ? Badges.renderBadgePillsHtml(p.id, false) : ''}
                                 ${p.isAdmin ? '<span class="count-tag in" style="font-size:0.62rem; padding:1px 6px;">Admin</span>' : ''}
                                 ${p.isGuest ? '<span class="squad-guest-tag">Guest</span>' : ''}
                             </div>

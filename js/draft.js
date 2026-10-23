@@ -1337,8 +1337,9 @@ const Draft = (() => {
                         <div class="pool-player-left">
                             <span class="pool-player-idx">${idx + 1}</span>
                             <div class="player-avatar-badge">${initials}</div>
-                            <div class="pool-player-info">
-                                <span class="pool-player-name">${safeHtml(pName)}</span>
+                            <div class="pool-player-info" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0; flex:1;">
+                                <span class="pool-player-name" onclick="Badges.openPassportModal('${safeHtml(pid)}', event)" style="cursor:pointer;" title="View Player Passport">${safeHtml(pName)}</span>
+                                ${(typeof Badges !== 'undefined') ? Badges.renderBadgePillsHtml(pid, false) : ''}
                             </div>
                         </div>
                         <button type="button" class="btn btn-sm btn-draft-pick ${pickBtnClass}"

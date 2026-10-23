@@ -386,6 +386,53 @@
                     <button type="button" id="confirm-ok" class="btn btn-danger">Confirm</button>
                 </div>
             </div>
+        <!-- ==================== PLAYER PASSPORT & BADGES MODAL ==================== -->
+        <div id="player-passport-modal" class="modal-overlay" style="display:none;" onclick="if(event.target.id==='player-passport-modal')Badges.closePassportModal()">
+            <div class="modal passport-modal">
+                <div class="passport-header">
+                    <div class="passport-avatar-wrap">
+                        <div id="passport-player-avatar" class="passport-avatar">🏏</div>
+                    </div>
+                    <div class="passport-user-info">
+                        <h3 id="passport-player-name" class="passport-name">Player</h3>
+                        <span id="passport-player-phone" class="passport-phone"></span>
+                    </div>
+                    <button type="button" class="passport-close-btn" onclick="Badges.closePassportModal()" aria-label="Close">✕</button>
+                </div>
+
+                <!-- Stats Summary Strip -->
+                <div class="passport-stats-strip">
+                    <div class="passport-stat-item">
+                        <span class="passport-stat-label">MATCHES PLAYED</span>
+                        <strong id="passport-matches-count" class="passport-stat-value">0 Matches</strong>
+                    </div>
+                    <div class="passport-stat-item">
+                        <span class="passport-stat-label">CURRENT RANK</span>
+                        <div id="passport-current-rank"></div>
+                    </div>
+                </div>
+
+                <!-- Next Rank Progress -->
+                <div class="passport-progress-card">
+                    <div class="passport-progress-header">
+                        <span>Road to Next Milestone</span>
+                        <strong id="passport-progress-text">15 matches to Club Regular</strong>
+                    </div>
+                    <div class="passport-progress-track">
+                        <div id="passport-progress-fill" class="passport-progress-fill" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <!-- Milestones & Badges Showcase -->
+                <div class="passport-badges-container">
+                    <h4 class="passport-section-title">Milestone Caps &amp; Honors</h4>
+                    <div id="passport-badges-list" class="passport-badges-list"></div>
+                </div>
+
+                <div class="modal-actions" style="margin-top:16px;">
+                    <button type="button" class="btn btn-primary btn-full" onclick="Badges.closePassportModal()">Close Passport</button>
+                </div>
+            </div>
         </div>
 
         <!-- ==================== TOAST ==================== -->
@@ -414,6 +461,7 @@
     <script src="js/db.js?v=9.0"></script>
     <script src="js/auth.js?v=9.0"></script>
     <script src="js/matches.js?v=9.0"></script>
+    <script src="js/badges.js?v=9.0"></script>
     <script src="js/squad.js?v=9.0"></script>
     <script src="js/draft.js?v=9.0"></script>
     <script src="js/admin.js?v=9.0"></script>

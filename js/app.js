@@ -84,8 +84,16 @@ const App = (() => {
         const user = Auth.getCurrentUser();
         if (!user) return;
 
-        // Update user name in top bar
-        document.getElementById('top-bar-user-name').textContent = user.name;
+        // Update user name in top bar and make clickable to open Player Passport
+        const userNameEl = document.getElementById('top-bar-user-name');
+        if (userNameEl) {
+            userNameEl.textContent = user.name;
+            userNameEl.style.cursor = 'pointer';
+            userNameEl.title = 'Click to view your Player Passport & Badges';
+            userNameEl.onclick = () => {
+                if (typeof Badges !== 'undefined') Badges.openPassportModal(user.id);
+            };
+        }
 
         // Show/hide admin controls
         const isAdmin = user.isAdmin === true;
@@ -368,7 +376,10 @@ const App = (() => {
                             <span class="squad-number">${idx + 1}</span>
                             <div class="player-avatar-badge">${getInitials(playerName)}</div>
                             <div class="squad-player-meta">
-                                <span class="squad-name">${escapeHtml(playerName)}</span>
+                                <div class="squad-name-row" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                    <span class="squad-name" onclick="Badges.openPassportModal('${pid}', event)" style="cursor:pointer;" title="View Player Passport">${escapeHtml(playerName)}</span>
+                                    ${(typeof Badges !== 'undefined') ? Badges.renderBadgePillsHtml(pid, idx === 0) : ''}
+                                </div>
                                 ${isAdmin ? (player && player.mobile ? `
                                     <a class="squad-admin-phone" href="tel:${escapeHtml(player.mobile)}" title="Call ${escapeHtml(playerName)}">
                                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
@@ -432,7 +443,10 @@ const App = (() => {
                                         <span class="squad-number wait">#${idx + 1}</span>
                                         <div class="player-avatar-badge wait">${getInitials(playerName)}</div>
                                         <div class="squad-player-meta">
-                                            <span class="squad-name">${escapeHtml(playerName)}</span>
+                                            <div class="squad-name-row" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                                <span class="squad-name" onclick="Badges.openPassportModal('${pid}', event)" style="cursor:pointer;" title="View Player Passport">${escapeHtml(playerName)}</span>
+                                                ${(typeof Badges !== 'undefined') ? Badges.renderBadgePillsHtml(pid, false) : ''}
+                                            </div>
                                             ${isAdmin ? (player && player.mobile ? `
                                                 <a class="squad-admin-phone" href="tel:${escapeHtml(player.mobile)}" title="Call ${escapeHtml(playerName)}">
                                                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
