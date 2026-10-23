@@ -3,47 +3,47 @@
    ============================================================ */
 const Badges = (() => {
 
-    /** Milestone Tiers (Descending order of difficulty) */
+    /** Milestone Tiers (Scaled to current club history: 1, 5, 15, 30, 50) */
     const MILESTONE_TIERS = [
         {
-            threshold: 100,
+            threshold: 50,
             id: 'hall_of_fame',
             icon: '👑',
             title: 'Hall of Fame',
             color: '#ffd700',
             bg: 'rgba(255, 215, 0, 0.16)',
             border: 'rgba(255, 215, 0, 0.45)',
-            desc: 'Century Legend (100+ Matches)'
+            desc: 'Half-Century Legend (50+ Matches)'
         },
         {
-            threshold: 50,
+            threshold: 30,
             id: 'veteran',
             icon: '🎖️',
             title: 'Club Veteran',
             color: '#e74c3c',
             bg: 'rgba(231, 76, 60, 0.16)',
             border: 'rgba(231, 76, 60, 0.45)',
-            desc: 'Half-Century Pillar (50+ Matches)'
+            desc: 'Club Pillar (30+ Matches)'
         },
         {
-            threshold: 25,
+            threshold: 15,
             id: 'iron_man',
             icon: '🛡️',
             title: 'Iron Man',
             color: '#3498db',
             bg: 'rgba(52, 152, 219, 0.16)',
             border: 'rgba(52, 152, 219, 0.45)',
-            desc: 'Stamina & Loyalty (25+ Matches)'
+            desc: 'Stamina & Loyalty (15+ Matches)'
         },
         {
-            threshold: 15,
+            threshold: 5,
             id: 'regular',
             icon: '⚔️',
             title: 'Club Regular',
             color: '#2ecc71',
             bg: 'rgba(46, 204, 113, 0.16)',
             border: 'rgba(46, 204, 113, 0.45)',
-            desc: 'Weekend Regular (15+ Matches)'
+            desc: 'Weekend Regular (5+ Matches)'
         },
         {
             threshold: 1,
