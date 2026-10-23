@@ -235,6 +235,9 @@ const DB = (() => {
                 if (typeof Auth !== 'undefined' && Auth.deduplicatePlayersAndMatches) {
                     Auth.deduplicatePlayersAndMatches();
                 }
+                if (typeof window.Admin !== 'undefined' && Admin.renderPlayersDirectory) {
+                    Admin.renderPlayersDirectory();
+                }
             }
         } catch (err) {
             console.warn('Error syncing players from Supabase:', err);

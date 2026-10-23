@@ -96,16 +96,24 @@ const Badges = (() => {
     function getPlayerMatchCount(playerId) {
         if (!playerId || typeof Matches === 'undefined' || !Matches.getAll) return 0;
         const player = (typeof Auth !== 'undefined' && Auth.getPlayerById) ? Auth.getPlayerById(playerId) : null;
-        const targetPhone = player && Auth.normalizePhone ? Auth.normalizePhone(player.mobile) : '';
+        let targetPhone = player && Auth.normalizePhone ? Auth.normalizePhone(player.mobile) : '';
+        if (!targetPhone && String(playerId).startsWith('p_')) {
+            targetPhone = Auth.normalizePhone ? Auth.normalizePhone(String(playerId).slice(2)) : String(playerId).slice(2);
+        }
+
         const allMatches = Matches.getAll() || [];
         const todayStr = getTodayStr();
 
         const matchesPlayer = (id) => {
             if (!id) return false;
             if (id === playerId) return true;
-            if (!targetPhone) return false;
-            const p = Auth.getPlayerById(id);
-            return p && Auth.normalizePhone && Auth.normalizePhone(p.mobile) === targetPhone;
+            if (targetPhone) {
+                if (id === `p_${targetPhone}`) return true;
+                if (id.startsWith('p_') && id.slice(2) === targetPhone) return true;
+                const p = (typeof Auth !== 'undefined' && Auth.getPlayerById) ? Auth.getPlayerById(id) : null;
+                if (p && Auth.normalizePhone && Auth.normalizePhone(p.mobile) === targetPhone) return true;
+            }
+            return false;
         };
 
         let count = 0;
@@ -152,15 +160,23 @@ const Badges = (() => {
     function hasEverBeenFirstOnSheet(playerId) {
         if (!playerId || typeof Matches === 'undefined' || !Matches.getAll) return false;
         const player = (typeof Auth !== 'undefined' && Auth.getPlayerById) ? Auth.getPlayerById(playerId) : null;
-        const targetPhone = player && Auth.normalizePhone ? Auth.normalizePhone(player.mobile) : '';
+        let targetPhone = player && Auth.normalizePhone ? Auth.normalizePhone(player.mobile) : '';
+        if (!targetPhone && String(playerId).startsWith('p_')) {
+            targetPhone = Auth.normalizePhone ? Auth.normalizePhone(String(playerId).slice(2)) : String(playerId).slice(2);
+        }
+
         const allMatches = Matches.getAll() || [];
 
         const matchesPlayer = (id) => {
             if (!id) return false;
             if (id === playerId) return true;
-            if (!targetPhone) return false;
-            const p = Auth.getPlayerById(id);
-            return p && Auth.normalizePhone && Auth.normalizePhone(p.mobile) === targetPhone;
+            if (targetPhone) {
+                if (id === `p_${targetPhone}`) return true;
+                if (id.startsWith('p_') && id.slice(2) === targetPhone) return true;
+                const p = (typeof Auth !== 'undefined' && Auth.getPlayerById) ? Auth.getPlayerById(id) : null;
+                if (p && Auth.normalizePhone && Auth.normalizePhone(p.mobile) === targetPhone) return true;
+            }
+            return false;
         };
 
         return allMatches.some(m => Array.isArray(m.playing) && m.playing.length > 0 && matchesPlayer(m.playing[0]));
