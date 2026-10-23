@@ -271,6 +271,8 @@ const Auth = (() => {
                     let matchesChanged = false;
 
                     matches.forEach(m => {
+                        // Never alter squad rosters of locked matches
+                        if (m.locked) return;
                         let mChanged = false;
                         const cleanList = (list) => {
                             if (!Array.isArray(list)) return [];
