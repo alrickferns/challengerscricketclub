@@ -8,14 +8,21 @@ const Squad = (() => {
         if (!Array.isArray(list) || !playerId) return false;
         if (list.includes(playerId)) return true;
 
-        const candidate = Auth.getPlayerById(playerId);
-        const candPhone = candidate && Auth.normalizePhone ? Auth.normalizePhone(candidate.mobile) : '';
-        if (!candPhone) return false;
+        const candidate = (typeof Auth !== 'undefined' && Auth.getPlayerById) ? Auth.getPlayerById(playerId) : null;
+        let candPhone = candidate && Auth.normalizePhone ? Auth.normalizePhone(candidate.mobile) : '';
+        if (!candPhone && typeof playerId === 'string' && playerId.startsWith('p_')) {
+            candPhone = playerId.slice(2);
+        }
 
         return list.some(id => {
             if (id === playerId) return true;
-            const p = Auth.getPlayerById(id);
-            return p && Auth.normalizePhone && Auth.normalizePhone(p.mobile) === candPhone;
+            if (!candPhone) return false;
+            let idPhone = typeof id === 'string' && id.startsWith('p_') ? id.slice(2) : '';
+            if (!idPhone && typeof Auth !== 'undefined' && Auth.getPlayerById) {
+                const p = Auth.getPlayerById(id);
+                idPhone = p && Auth.normalizePhone ? Auth.normalizePhone(p.mobile) : '';
+            }
+            return idPhone && idPhone === candPhone;
         });
     }
 
@@ -60,14 +67,21 @@ const Squad = (() => {
         if (!match) return { success: false, message: 'Match not found' };
         if (match.locked) return { success: false, message: 'Squad is locked — contact admin' };
 
-        const candidate = Auth.getPlayerById(playerId);
-        const candPhone = candidate && Auth.normalizePhone ? Auth.normalizePhone(candidate.mobile) : '';
+        const candidate = (typeof Auth !== 'undefined' && Auth.getPlayerById) ? Auth.getPlayerById(playerId) : null;
+        let candPhone = candidate && Auth.normalizePhone ? Auth.normalizePhone(candidate.mobile) : '';
+        if (!candPhone && typeof playerId === 'string' && playerId.startsWith('p_')) {
+            candPhone = playerId.slice(2);
+        }
 
         const matchesPlayer = (id) => {
             if (id === playerId) return true;
             if (!candPhone) return false;
-            const p = Auth.getPlayerById(id);
-            return p && Auth.normalizePhone && Auth.normalizePhone(p.mobile) === candPhone;
+            let idPhone = typeof id === 'string' && id.startsWith('p_') ? id.slice(2) : '';
+            if (!idPhone && typeof Auth !== 'undefined' && Auth.getPlayerById) {
+                const p = Auth.getPlayerById(id);
+                idPhone = p && Auth.normalizePhone ? Auth.normalizePhone(p.mobile) : '';
+            }
+            return idPhone && idPhone === candPhone;
         };
 
         const wasPlaying = match.playing.some(matchesPlayer);
@@ -108,14 +122,21 @@ const Squad = (() => {
 
         if (isPlayerInList(match.playing, playerId)) return 'playing';
 
-        const candidate = Auth.getPlayerById(playerId);
-        const candPhone = candidate && Auth.normalizePhone ? Auth.normalizePhone(candidate.mobile) : '';
+        const candidate = (typeof Auth !== 'undefined' && Auth.getPlayerById) ? Auth.getPlayerById(playerId) : null;
+        let candPhone = candidate && Auth.normalizePhone ? Auth.normalizePhone(candidate.mobile) : '';
+        if (!candPhone && typeof playerId === 'string' && playerId.startsWith('p_')) {
+            candPhone = playerId.slice(2);
+        }
 
         const waitIdx = match.waiting.findIndex(id => {
             if (id === playerId) return true;
             if (!candPhone) return false;
-            const p = Auth.getPlayerById(id);
-            return p && Auth.normalizePhone && Auth.normalizePhone(p.mobile) === candPhone;
+            let idPhone = typeof id === 'string' && id.startsWith('p_') ? id.slice(2) : '';
+            if (!idPhone && typeof Auth !== 'undefined' && Auth.getPlayerById) {
+                const p = Auth.getPlayerById(id);
+                idPhone = p && Auth.normalizePhone ? Auth.normalizePhone(p.mobile) : '';
+            }
+            return idPhone && idPhone === candPhone;
         });
 
         if (waitIdx !== -1) return 'waiting:' + (waitIdx + 1);
