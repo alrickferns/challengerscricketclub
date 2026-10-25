@@ -3378,17 +3378,23 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 .war-teams-carousel {
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 8px;
     overflow-x: auto;
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
-    padding: 2px 2px 6px 2px;
+    padding: 2px 4px 8px 4px;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
 }
 .war-teams-carousel::-webkit-scrollbar { display: none; }
+
+@media (min-width: 600px) {
+    .war-teams-carousel {
+        justify-content: center;
+    }
+}
 
 .war-team-card {
     flex: 1 1 140px;
