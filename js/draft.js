@@ -1322,14 +1322,14 @@ const Draft = (() => {
                     : pName.substr(0, 2).toUpperCase();
 
                 let pickBtnClass = 'btn-disabled';
-                let pickBtnText = 'Wait Turn';
+                let pickBtnText = 'Wait';
 
                 if (isUserTurn) {
                     pickBtnClass = 'btn-active-pick';
-                    pickBtnText = 'Select Player ➔';
+                    pickBtnText = 'Pick ➔';
                 } else if (isAdmin) {
                     pickBtnClass = 'btn-proxy-pick';
-                    pickBtnText = '🛡️ Select ➔';
+                    pickBtnText = '🛡️ Pick ➔';
                 }
 
                 return `
@@ -1337,9 +1337,11 @@ const Draft = (() => {
                         <div class="pool-player-left">
                             <span class="pool-player-idx">${idx + 1}</span>
                             <div class="player-avatar-badge">${initials}</div>
-                            <div class="pool-player-info" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0; flex:1;">
+                            <div class="pool-player-info">
                                 <span class="pool-player-name" onclick="Badges.openPassportModal('${safeHtml(pid)}', event)" style="cursor:pointer;" title="View Player Passport">${safeHtml(pName)}</span>
-                                ${(typeof Badges !== 'undefined') ? Badges.renderBadgePillsHtml(pid, false) : ''}
+                                <div class="pool-player-sub-row">
+                                    ${(typeof Badges !== 'undefined') ? Badges.renderBadgePillsHtml(pid, false) : ''}
+                                </div>
                             </div>
                         </div>
                         <button type="button" class="btn btn-sm btn-draft-pick ${pickBtnClass}"

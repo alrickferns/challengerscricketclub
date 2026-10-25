@@ -3685,8 +3685,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .pool-cards-grid {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    max-height: 420px;
+    gap: 7px;
+    max-height: 440px;
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 2px;
@@ -3695,21 +3695,28 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     box-sizing: border-box;
 }
 
+@media (min-width: 768px) {
+    .pool-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+}
+
 .pool-player-card {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 6px;
+    gap: 8px;
     background: rgba(255, 255, 255, 0.035);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
-    padding: 7px 8px;
+    padding: 8px 10px;
     transition: all 0.2s ease;
     width: 100%;
     max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
-    overflow: hidden;
 }
 
 .pool-player-card:hover {
@@ -3720,46 +3727,61 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .pool-player-left {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     min-width: 0;
     flex: 1;
-    overflow: hidden;
 }
 
 .pool-player-idx {
     font-size: 0.72rem;
     font-weight: 700;
     color: var(--text-muted);
-    width: 16px;
+    width: 18px;
     text-align: center;
     flex-shrink: 0;
 }
 
 .pool-player-left .player-avatar-badge {
-    width: 32px;
-    height: 32px;
-    font-size: 0.72rem;
+    width: 34px;
+    height: 34px;
+    font-size: 0.74rem;
     flex-shrink: 0;
 }
 
 .pool-player-info {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 3px;
     min-width: 0;
     flex: 1;
-    overflow: hidden;
 }
 
 .pool-player-name {
-    font-size: 0.82rem;
+    font-size: 0.88rem;
     font-weight: 700;
     color: #ffffff;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.2;
+    line-height: 1.25;
     min-width: 0;
-    flex: 1;
+    max-width: 100%;
+}
+
+.pool-player-sub-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 1px;
+}
+
+.pool-player-sub-row .player-badge-pill {
+    padding: 1px 6px;
+    font-size: 0.62rem;
+    line-height: 1.2;
 }
 
 .btn-draft-pick {
@@ -3769,12 +3791,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     gap: 4px;
     font-size: 0.74rem;
     font-weight: 800;
-    padding: 6px 10px;
+    padding: 6px 12px;
     border-radius: var(--radius-sm);
     flex-shrink: 0;
     cursor: pointer;
     line-height: 1.2;
-    min-height: 30px;
+    min-height: 32px;
     transition: all 0.2s ease;
     white-space: nowrap;
 }
@@ -4559,24 +4581,31 @@ input[type="time"]::-webkit-calendar-picker-indicator {
         padding: 10px 6px;
     }
     .pool-player-card {
-        padding: 6px 6px;
-        gap: 4px;
+        padding: 6px 8px;
+        gap: 6px;
     }
     .pool-player-idx {
-        width: 12px;
+        width: 14px;
         font-size: 0.68rem;
     }
+    .pool-player-left {
+        gap: 6px;
+    }
     .pool-player-left .player-avatar-badge {
-        width: 28px;
-        height: 28px;
+        width: 30px;
+        height: 30px;
         font-size: 0.68rem;
     }
     .pool-player-name {
-        font-size: 0.78rem;
+        font-size: 0.82rem;
+    }
+    .pool-player-sub-row .player-badge-pill {
+        padding: 1px 5px;
+        font-size: 0.58rem;
     }
     .btn-draft-pick {
-        padding: 5px 8px;
-        font-size: 0.7rem;
+        padding: 5px 9px;
+        font-size: 0.72rem;
         min-height: 28px;
     }
     .war-team-card {
