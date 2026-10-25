@@ -14,20 +14,55 @@ const Matches = (() => {
         }
     }
 
-    /** Get all matches */
+    // In-memory cache & fast lookup map
+    let _matchesCache = null;
+    let _matchesIdMap = new Map();
+
+    function _rebuildMatchesIndex(matches) {
+        _matchesCache = Array.isArray(matches) ? matches : [];
+        _matchesIdMap.clear();
+        for (const m of _matchesCache) {
+            if (m && m.id) {
+                _matchesIdMap.set(m.id, m);
+            }
+        }
+    }
+
+    /** Invalidate cache on external sync */
+    function invalidateCache() {
+        _matchesCache = null;
+        _matchesIdMap.clear();
+        if (typeof window !== 'undefined' && window.Badges && Badges.invalidateCache) {
+            Badges.invalidateCache();
+        }
+    }
+
+    /** Get all matches (cached in-memory) */
     function getAll() {
+        if (_matchesCache !== null) {
+            return _matchesCache;
+        }
         const parsed = safeJsonParse(localStorage.getItem(STORAGE_KEY), []);
-        return Array.isArray(parsed) ? parsed : [];
+        _rebuildMatchesIndex(parsed);
+        return _matchesCache;
     }
 
-    /** Save matches array */
+    /** Save matches array and sync in-memory cache */
     function save(matches) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(matches));
+        _rebuildMatchesIndex(matches);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(_matchesCache));
+        if (typeof window !== 'undefined' && window.Badges && Badges.invalidateCache) {
+            Badges.invalidateCache();
+        }
     }
 
-    /** Get a single match by ID */
+    /** Get a single match by ID (O(1) in-memory lookup) */
     function getById(id) {
-        return getAll().find(m => m.id === id) || null;
+        if (!id) return null;
+        if (_matchesCache === null) {
+            getAll();
+        }
+        return _matchesIdMap.get(id) || null;
     }
 
     /** Create a new match */
@@ -129,6 +164,7 @@ const Matches = (() => {
         getAll,
         getById,
         save,
+        invalidateCache,
         create,
         update,
         remove,

@@ -181,7 +181,11 @@ const DB = (() => {
                     hasFormatColumn = ('format' in data[0]);
                 }
                 const matches = data.map(dbToMatch);
-                localStorage.setItem('ccc_matches', JSON.stringify(matches));
+                if (typeof Matches !== 'undefined' && Matches.save) {
+                    Matches.save(matches);
+                } else {
+                    localStorage.setItem('ccc_matches', JSON.stringify(matches));
+                }
 
                 // Trigger UI refresh
                 if (window.App) {
@@ -231,7 +235,11 @@ const DB = (() => {
 
             if (Array.isArray(data)) {
                 const players = data.map(dbToPlayer);
-                localStorage.setItem('ccc_players', JSON.stringify(players));
+                if (typeof Auth !== 'undefined' && Auth.savePlayers) {
+                    Auth.savePlayers(players);
+                } else {
+                    localStorage.setItem('ccc_players', JSON.stringify(players));
+                }
                 if (typeof Auth !== 'undefined' && Auth.deduplicatePlayersAndMatches) {
                     Auth.deduplicatePlayersAndMatches();
                 }

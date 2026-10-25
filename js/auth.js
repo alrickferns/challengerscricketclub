@@ -33,14 +33,55 @@ const Auth = (() => {
         }
     }
 
-    /** Get all registered players */
-    function getPlayers() {
-        return safeJsonParse(localStorage.getItem(PLAYERS_KEY), []);
+    // In-memory cache & fast lookup maps to prevent expensive repeated JSON parsing
+    let _playersCache = null;
+    let _playersIdMap = new Map();
+    let _playersPhoneMap = new Map();
+
+    function _rebuildPlayerIndex(players) {
+        _playersCache = Array.isArray(players) ? players : [];
+        _playersIdMap.clear();
+        _playersPhoneMap.clear();
+        for (const p of _playersCache) {
+            if (!p) continue;
+            if (p.id) _playersIdMap.set(p.id, p);
+            const normPhone = normalizePhone(p.mobile);
+            if (normPhone) {
+                _playersPhoneMap.set(normPhone, p);
+                if (!_playersIdMap.has(`p_${normPhone}`)) {
+                    _playersIdMap.set(`p_${normPhone}`, p);
+                }
+            }
+        }
     }
 
-    /** Save players array */
+    /** Invalidate in-memory cache when external storage changes */
+    function invalidatePlayerCache() {
+        _playersCache = null;
+        _playersIdMap.clear();
+        _playersPhoneMap.clear();
+        if (typeof window !== 'undefined' && window.Badges && Badges.invalidateCache) {
+            Badges.invalidateCache();
+        }
+    }
+
+    /** Get all registered players (cached in-memory) */
+    function getPlayers() {
+        if (_playersCache !== null) {
+            return _playersCache;
+        }
+        const players = safeJsonParse(localStorage.getItem(PLAYERS_KEY), []);
+        _rebuildPlayerIndex(players);
+        return _playersCache;
+    }
+
+    /** Save players array and sync in-memory cache */
     function savePlayers(players) {
-        localStorage.setItem(PLAYERS_KEY, JSON.stringify(players));
+        _rebuildPlayerIndex(players);
+        localStorage.setItem(PLAYERS_KEY, JSON.stringify(_playersCache));
+        if (typeof window !== 'undefined' && window.Badges && Badges.invalidateCache) {
+            Badges.invalidateCache();
+        }
     }
 
     /** Get currently logged-in user (or null) */
@@ -143,17 +184,23 @@ const Auth = (() => {
         }
     }
 
-    /** Look up a player by ID (also checks phone match fallback) */
+    /** Look up a player by ID (O(1) in-memory lookup with phone match fallback) */
     function getPlayerById(id) {
         if (!id) return null;
-        const players = getPlayers();
-        const byId = players.find(p => p.id === id);
+        if (_playersCache === null) {
+            getPlayers();
+        }
+        const byId = _playersIdMap.get(id);
         if (byId) return byId;
 
-        // Fallback: if id is 'p_<phone>'
+        // Fallback: if id is 'p_<phone>' or raw phone
         if (id.startsWith('p_')) {
             const phone = id.slice(2);
-            return players.find(p => normalizePhone(p.mobile) === phone) || null;
+            return _playersPhoneMap.get(phone) || null;
+        }
+        const directPhone = normalizePhone(id);
+        if (directPhone && _playersPhoneMap.has(directPhone)) {
+            return _playersPhoneMap.get(directPhone);
         }
         return null;
     }
@@ -275,6 +322,8 @@ const Auth = (() => {
 
     return {
         getPlayers,
+        savePlayers,
+        invalidatePlayerCache,
         getCurrentUser,
         login,
         logout,
