@@ -1093,9 +1093,17 @@ const App = (() => {
             const mobile = document.getElementById('login-mobile').value.trim();
 
             if (!name) { showToast('Please enter your name'); return; }
-            if (!/^\d{10}$/.test(mobile)) { showToast('Enter a valid 10-digit mobile number'); return; }
+            
+            const cleanMobile = (typeof Auth !== 'undefined' && Auth.normalizePhone)
+                ? Auth.normalizePhone(mobile)
+                : mobile.replace(/\D/g, '').slice(-10);
 
-            const user = Auth.login(name, mobile);
+            if (!/^\d{10}$/.test(cleanMobile)) {
+                showToast('Enter a valid 10-digit mobile number');
+                return;
+            }
+
+            const user = Auth.login(name, cleanMobile);
             showScreen('home');
             showToast(`Welcome, ${user.name}! 🏏`);
         });
@@ -1273,14 +1281,20 @@ const App = (() => {
                     return;
                 }
 
-                if (mobile && !/^\d{10}$/.test(mobile)) {
-                    showToast('Mobile number must be 10 digits if provided');
-                    return;
+                let cleanMobile = '';
+                if (mobile) {
+                    cleanMobile = (typeof Auth !== 'undefined' && Auth.normalizePhone)
+                        ? Auth.normalizePhone(mobile)
+                        : mobile.replace(/\D/g, '').slice(-10);
+                    if (!/^\d{10}$/.test(cleanMobile)) {
+                        showToast('Mobile number must be 10 digits if provided');
+                        return;
+                    }
                 }
 
                 const result = (window.DB && DB.isLive())
-                    ? await DB.adminAddPlayer(matchId, { name, mobile, target })
-                    : Squad.adminAddPlayer(matchId, { name, mobile, target });
+                    ? await DB.adminAddPlayer(matchId, { name, mobile: cleanMobile, target })
+                    : Squad.adminAddPlayer(matchId, { name, mobile: cleanMobile, target });
                 if (result.success) {
                     showToast(result.message);
                     closeAddPlayerModal();
