@@ -15,6 +15,7 @@ create table if not exists public.matches (
   playing jsonb default '[]'::jsonb,
   waiting jsonb default '[]'::jsonb,
   locked boolean default false,
+  opens_at text default null,
   created_at timestamptz default now()
 );
 

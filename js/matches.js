@@ -83,6 +83,7 @@ const Matches = (() => {
             playing: [],
             waiting: [],
             locked: false,
+            opensAt: data.opensAt ? data.opensAt : null,
             createdAt: new Date().toISOString()
         };
         matches.push(match);

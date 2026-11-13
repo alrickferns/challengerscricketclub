@@ -169,9 +169,9 @@ const Badges = (() => {
             // 1. Date is in the past (completed game), OR
             // 2. Match was locked by admin (confirmed lineup), OR
             // 3. Draft was conducted/completed for this match
-            const isPlayedMatch = (m.date && m.date < todayStr) || 
-                                  Boolean(m.locked) || 
-                                  Boolean(m.draft && (m.draft.status === 'completed' || m.draft.status === 'in_progress'));
+            const isPlayedMatch = (m.date && m.date < todayStr) ||
+                Boolean(m.locked) ||
+                Boolean(m.draft && (m.draft.status === 'completed' || m.draft.status === 'in_progress'));
 
             if (!isPlayedMatch) continue;
 
@@ -309,6 +309,81 @@ const Badges = (() => {
     }
 
     /**
+     * Confetti particle burst for milestone celebrations (Point 7)
+     */
+    function triggerConfetti() {
+        if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+        let canvas = document.getElementById('passport-confetti-canvas');
+        if (!canvas) {
+            canvas = document.createElement('canvas');
+            canvas.id = 'passport-confetti-canvas';
+            canvas.className = 'passport-confetti-canvas';
+            document.body.appendChild(canvas);
+        }
+        canvas.width = window.innerWidth || 360;
+        canvas.height = window.innerHeight || 640;
+        if (typeof canvas.getContext !== 'function') return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const colors = ['#f1c40f', '#2ecc71', '#3498db', '#e74c3c', '#ffd700', '#ffffff'];
+        const particles = [];
+        const count = 65;
+
+        for (let i = 0; i < count; i++) {
+            particles.push({
+                x: canvas.width * 0.5 + (Math.random() - 0.5) * 160,
+                y: canvas.height * 0.35 + (Math.random() - 0.5) * 60,
+                w: Math.random() * 8 + 4,
+                h: Math.random() * 6 + 4,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                vx: (Math.random() - 0.5) * 8.5,
+                vy: Math.random() * -6.5 - 2.5,
+                gravity: 0.18,
+                angle: Math.random() * 360,
+                vAngle: (Math.random() - 0.5) * 11,
+                opacity: 1
+            });
+        }
+
+        const startT = performance.now();
+        function render(now) {
+            const elapsed = now - startT;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            particles.forEach(p => {
+                p.x += p.vx;
+                p.vy += p.gravity;
+                p.y += p.vy;
+                p.angle += p.vAngle;
+                if (elapsed > 1400) {
+                    p.opacity = Math.max(0, 1 - (elapsed - 1400) / 800);
+                }
+
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate((p.angle * Math.PI) / 180);
+                ctx.globalAlpha = p.opacity;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+                ctx.restore();
+            });
+
+            if (elapsed < 2300) {
+                requestAnimationFrame(render);
+            } else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                if (canvas && canvas.parentNode) {
+                    canvas.parentNode.removeChild(canvas);
+                }
+            }
+        }
+
+        requestAnimationFrame(render);
+    }
+
+    /**
      * Open the slick CCC Player Passport Modal
      */
     function openPassportModal(playerId, event) {
@@ -331,6 +406,7 @@ const Badges = (() => {
         const progressFillEl = document.getElementById('passport-progress-fill');
         const progressTextEl = document.getElementById('passport-progress-text');
         const badgesListEl = document.getElementById('passport-badges-list');
+        const celebrationBannerEl = document.getElementById('passport-celebration-banner');
 
         const initials = (typeof App !== 'undefined' && App.getInitials) ? App.getInitials(player.name) : '🏏';
         const formattedPhone = (typeof App !== 'undefined' && App.formatPhone) ? App.formatPhone(player.mobile) : player.mobile;
@@ -346,6 +422,32 @@ const Badges = (() => {
             }
         }
         if (matchesCountEl) matchesCountEl.textContent = `${status.matchesCount} Matches`;
+
+        // Milestone Level-Up Celebration Banner (Point 7)
+        if (celebrationBannerEl) {
+            if (status.currentMilestone && status.currentMilestone.threshold >= 5) {
+                celebrationBannerEl.style.display = 'block';
+                celebrationBannerEl.innerHTML = `
+                    <div class="passport-celebration-card" style="background:${status.currentMilestone.bg}; border-color:${status.currentMilestone.border};">
+                        <div class="celebration-badge-icon">${status.currentMilestone.icon}</div>
+                        <div class="celebration-badge-content">
+                            <div class="celebration-badge-title-row">
+                                <span class="celebration-badge-tag" style="color:${status.currentMilestone.color};">★ MILESTONE UNLOCKED</span>
+                                <span class="celebration-caps-count">${status.matchesCount} Caps</span>
+                            </div>
+                            <div class="celebration-milestone-name">
+                                ${safeHtml(status.currentMilestone.title)}
+                            </div>
+                            <p class="celebration-milestone-desc">${safeHtml(status.currentMilestone.desc)}</p>
+                        </div>
+                    </div>`;
+                // Trigger celebratory confetti burst
+                setTimeout(() => triggerConfetti(), 80);
+            } else {
+                celebrationBannerEl.style.display = 'none';
+                celebrationBannerEl.innerHTML = '';
+            }
+        }
 
         if (currentRankEl) {
             if (status.currentMilestone) {
@@ -422,6 +524,12 @@ const Badges = (() => {
     function closePassportModal() {
         const modal = document.getElementById('player-passport-modal');
         if (modal) modal.style.display = 'none';
+
+        // Remove active confetti canvas if open
+        const canvas = document.getElementById('passport-confetti-canvas');
+        if (canvas && canvas.parentNode) {
+            canvas.parentNode.removeChild(canvas);
+        }
     }
 
     return {
@@ -433,6 +541,7 @@ const Badges = (() => {
         renderBadgePillsHtml,
         openPassportModal,
         closePassportModal,
+        triggerConfetti,
         invalidateCache
     };
 })();

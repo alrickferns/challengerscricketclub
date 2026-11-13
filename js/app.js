@@ -13,12 +13,9 @@ const App = (() => {
     /* ----------------------------------------------------------
        INITIALIZATION
     ---------------------------------------------------------- */
-    function init() {
+    async function init() {
         if (window.Auth && Auth.deduplicatePlayersAndMatches) {
             Auth.deduplicatePlayersAndMatches();
-        }
-        if (window.DB && DB.init) {
-            DB.init();
         }
         const user = Auth.getCurrentUser();
         if (user) {
@@ -27,6 +24,10 @@ const App = (() => {
             showScreen('login');
         }
         bindEvents();
+        startCountdownEngine();
+        if (window.DB && DB.init) {
+            await DB.init();
+        }
     }
 
     /* ----------------------------------------------------------
@@ -104,6 +105,7 @@ const App = (() => {
         renderMatchCards();
         renderTicker();
         checkAndNotifyPersonalPromotion();
+        checkAndNotifyPersonalMilestone();
     }
 
     /* ----------------------------------------------------------
@@ -205,6 +207,10 @@ const App = (() => {
             const emptyCount = Math.max(0, match.maxPlayers - playingCount);
             const fillPercent = Math.min(100, (playingCount / match.maxPlayers) * 100);
 
+            const isTeaser = match.opensAt && (new Date(match.opensAt).getTime() > Date.now());
+            const countdownRemainingMs = isTeaser ? (new Date(match.opensAt).getTime() - Date.now()) : 0;
+            const countdownStr = isTeaser ? formatCountdown(countdownRemainingMs) : '';
+
             const playerStatus = Squad.getPlayerStatus(match.id, user.id);
             let actionBtn = '';
 
@@ -214,6 +220,8 @@ const App = (() => {
                 actionBtn = `<button class="btn btn-leave btn-sm" data-action="leave" data-match-id="${match.id}">Leave</button>`;
             } else if (playerStatus.startsWith('waiting')) {
                 actionBtn = `<button class="btn btn-leave btn-sm" data-action="leave" data-match-id="${match.id}">Leave Queue</button>`;
+            } else if (isTeaser) {
+                actionBtn = `<button class="btn btn-teaser btn-sm" disabled data-countdown-btn="${match.id}">⏱️ Opens Soon</button>`;
             } else if (playingCount < match.maxPlayers) {
                 actionBtn = `<button class="btn btn-join btn-sm" data-action="join" data-match-id="${match.id}">I'm In!</button>`;
             } else {
@@ -226,12 +234,14 @@ const App = (() => {
             } else if (playerStatus.startsWith('waiting')) {
                 const pos = playerStatus.split(':')[1];
                 statusBadge = `<span class="player-status-badge waiting">⏳ #${pos} Waiting</span>`;
+            } else if (isTeaser) {
+                statusBadge = `<span class="match-teaser-chip" data-countdown-badge="${match.id}"><span class="teaser-icon">⏳</span><span class="teaser-text">Opens in ${countdownStr}</span></span>`;
             }
 
             const timeStr = formatTimeRange(match.startTime || match.time, match.endTime);
 
             return `
-                <div class="match-card" data-match-id="${match.id}">
+                <div class="match-card ${isTeaser ? 'match-card-teaser' : ''}" data-match-id="${match.id}">
                     <div class="match-card-header">
                         <div class="match-card-date-time">
                             <span class="match-date-text">${dateStr}</span>
@@ -249,10 +259,13 @@ const App = (() => {
                         <span>${escapeHtml(match.turf)}</span>
                     </div>
                     <div class="match-card-progress">
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${fillPercent}%"></div>
+                        <div class="progress-bar ${isTeaser ? 'progress-bar-teaser' : ''}">
+                            <div class="progress-fill ${isTeaser ? 'progress-fill-teaser' : ''}" style="width: ${fillPercent}%"></div>
                         </div>
-                        <span class="progress-text">${playingCount}/${match.maxPlayers} Spots Filled</span>
+                        ${isTeaser 
+                            ? `<span class="progress-text teaser-gold">⏳ ${match.maxPlayers} Spots Opening Soon</span>`
+                            : `<span class="progress-text">${playingCount}/${match.maxPlayers} Spots Filled</span>`
+                        }
                     </div>
                     <div class="match-card-footer">
                         <div class="slot-badges">
@@ -486,6 +499,10 @@ const App = (() => {
                 </div>`
             : '';
 
+        const isTeaser = match.opensAt && (new Date(match.opensAt).getTime() > Date.now());
+        const teaserRemainingMs = isTeaser ? (new Date(match.opensAt).getTime() - Date.now()) : 0;
+        const teaserCountdownStr = isTeaser ? formatCountdown(teaserRemainingMs) : '';
+
         // Action button
         let actionHtml = '';
         if (match.locked) {
@@ -494,6 +511,26 @@ const App = (() => {
             actionHtml = `<button class="btn btn-leave btn-full" id="detail-leave-btn">
                             Leave Squad
                           </button>`;
+        } else if (isTeaser) {
+            actionHtml = `
+                <div class="teaser-countdown-card" id="detail-teaser-card" data-match-id="${match.id}">
+                    <div class="teaser-countdown-header">
+                        <span class="teaser-badge">⏳ TEASER MODE</span>
+                        <span class="teaser-open-date">Opens ${formatOpensAtDate(match.opensAt)}</span>
+                    </div>
+                    <div class="teaser-timer-display" data-countdown-timer="${match.id}">
+                        ${teaserCountdownStr}
+                    </div>
+                    <p class="teaser-note">Registration opens automatically when the countdown hits zero!</p>
+                    ${isAdmin ? `
+                        <button type="button" class="btn btn-xs btn-outline-gold" style="margin-top:10px; width:100%; font-weight:700;"
+                                onclick="App.handleOpenRegistrationNow('${match.id}')">
+                            ⚡ Admin Override: Open Registration Now
+                        </button>` : ''}
+                </div>
+                <button class="btn btn-teaser btn-full" disabled id="detail-teaser-btn" data-countdown-btn="${match.id}">
+                    🔒 Opens in ${teaserCountdownStr}
+                </button>`;
         } else if (match.playing.length < match.maxPlayers) {
             actionHtml = `<button class="btn btn-join btn-full" id="detail-join-btn">
                             I'm In! 🏏
@@ -584,8 +621,8 @@ const App = (() => {
                 <div class="detail-squad-header">
                     <div class="squad-title-group">
                         <h3>Playing Squad</h3>
-                        <span class="squad-status ${match.locked ? 'locked' : 'open'}">
-                            ${match.locked ? '🔒 LOCKED' : 'OPEN'}
+                        <span class="squad-status ${match.locked ? 'locked' : (isTeaser ? 'teaser' : 'open')}">
+                            ${match.locked ? '🔒 LOCKED' : (isTeaser ? '⏳ OPENS SOON' : 'OPEN')}
                         </span>
                     </div>
                     ${isAdmin ? `
@@ -630,17 +667,19 @@ const App = (() => {
         // Bind detail action buttons
         const joinBtn = document.getElementById('detail-join-btn');
         if (joinBtn) {
-            joinBtn.addEventListener('click', () => {
-                joinMatch(matchId);
-                renderMatchDetail(matchId);
+            joinBtn.addEventListener('click', async () => {
+                joinBtn.disabled = true;
+                await joinMatch(matchId);
+                joinBtn.disabled = false;
             });
         }
 
         const leaveBtn = document.getElementById('detail-leave-btn');
         if (leaveBtn) {
-            leaveBtn.addEventListener('click', () => {
-                leaveMatch(matchId);
-                renderMatchDetail(matchId);
+            leaveBtn.addEventListener('click', async () => {
+                leaveBtn.disabled = true;
+                await leaveMatch(matchId);
+                leaveBtn.disabled = false;
             });
         }
     }
@@ -657,6 +696,10 @@ const App = (() => {
         showToast(result.message);
         renderMatchCards();
         renderTicker();
+        const detailScreen = document.getElementById('match-detail-screen');
+        if (detailScreen && detailScreen.classList.contains('active')) {
+            renderMatchDetail(matchId);
+        }
     }
 
     async function leaveMatch(matchId) {
@@ -678,6 +721,10 @@ const App = (() => {
 
         renderMatchCards();
         renderTicker();
+        const detailScreen = document.getElementById('match-detail-screen');
+        if (detailScreen && detailScreen.classList.contains('active')) {
+            renderMatchDetail(matchId);
+        }
     }
 
     function showMatchDetail(matchId) {
@@ -757,6 +804,114 @@ const App = (() => {
         const m = String(date.getMonth() + 1).padStart(2, '0');
         const d = String(date.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
+    }
+
+    /** Format countdown milliseconds into 02h 14m 32s or 2d 04h 12m */
+    function formatCountdown(ms) {
+        if (ms <= 0) return '00:00';
+        const totalSecs = Math.floor(ms / 1000);
+        const days = Math.floor(totalSecs / 86400);
+        const hours = Math.floor((totalSecs % 86400) / 3600);
+        const mins = Math.floor((totalSecs % 3600) / 60);
+        const secs = totalSecs % 60;
+
+        const pad = n => String(n).padStart(2, '0');
+
+        if (days > 0) {
+            return `${days}d ${pad(hours)}h ${pad(mins)}m`;
+        }
+        if (hours > 0) {
+            return `${pad(hours)}h ${pad(mins)}m ${pad(secs)}s`;
+        }
+        return `${pad(mins)}m ${pad(secs)}s`;
+    }
+
+    /** Format opensAt ISO string into a friendly date & time */
+    function formatOpensAtDate(opensAtStr) {
+        if (!opensAtStr) return '';
+        try {
+            const d = new Date(opensAtStr);
+            const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            return `${dateStr} at ${timeStr}`;
+        } catch (e) {
+            return opensAtStr;
+        }
+    }
+
+    /** Admin override to open registration immediately */
+    function handleOpenRegistrationNow(matchId) {
+        if (typeof Admin !== 'undefined' && Admin.handleOpenRegistrationNow) {
+            Admin.handleOpenRegistrationNow(matchId);
+        } else {
+            Matches.update(matchId, { opensAt: null });
+            showToast('Registration is now open! 🏏');
+            renderMatchCards();
+            renderTicker();
+            const detailScreen = document.getElementById('match-detail-screen');
+            if (detailScreen && detailScreen.classList.contains('active')) {
+                renderMatchDetail(matchId);
+            }
+        }
+    }
+
+    /* ----------------------------------------------------------
+       LIVE TEASER COUNTDOWN ENGINE (1-SEC TICKER)
+    ---------------------------------------------------------- */
+    let _countdownInterval = null;
+    function startCountdownEngine() {
+        if (_countdownInterval) clearInterval(_countdownInterval);
+
+        _countdownInterval = setInterval(() => {
+            if (typeof Matches === 'undefined') return;
+            const matches = Matches.getAll();
+            if (!Array.isArray(matches) || matches.length === 0) return;
+
+            // Zero CPU idle guard: exit immediately if no matches have opensAt
+            if (!matches.some(m => m && m.opensAt)) return;
+
+            const now = Date.now();
+            let needReRender = false;
+
+            matches.forEach(m => {
+                if (!m.opensAt) return;
+                const targetTime = new Date(m.opensAt).getTime();
+                const diff = targetTime - now;
+
+                if (diff > 0) {
+                    const formatted = formatCountdown(diff);
+
+                    // Update badge text on match card if visible
+                    document.querySelectorAll(`[data-countdown-badge="${m.id}"] .teaser-text`).forEach(el => {
+                        el.textContent = `Opens in ${formatted}`;
+                    });
+                    // Update timer display on match detail card if visible
+                    document.querySelectorAll(`[data-countdown-timer="${m.id}"]`).forEach(el => {
+                        el.textContent = formatted;
+                    });
+                    // Update button label if visible
+                    document.querySelectorAll(`[data-countdown-btn="${m.id}"]`).forEach(el => {
+                        el.textContent = `🔒 Opens in ${formatted}`;
+                    });
+                } else if (diff <= 0) {
+                    // Reached zero or expired!
+                    m.opensAt = null;
+                    needReRender = true;
+                    showToast(`🎉 Registration is now OPEN for ${m.turf}! 🏏`);
+                }
+            });
+
+            if (needReRender) {
+                renderMatchCards();
+                renderTicker();
+                const detailScreen = document.getElementById('match-detail-screen');
+                if (detailScreen && detailScreen.classList.contains('active')) {
+                    const matchIdInput = document.getElementById('add-player-match-id');
+                    const activeMatchId = matchIdInput ? matchIdInput.value : null;
+                    if (activeMatchId) renderMatchDetail(activeMatchId);
+                }
+            }
+        }, 1000);
     }
 
     /* ----------------------------------------------------------
@@ -954,6 +1109,27 @@ const App = (() => {
         localStorage.setItem(storageKey, JSON.stringify(newStatusMap));
     }
 
+    /**
+     * Checks if current user has reached a milestone (e.g. Club Regular, Iron Man)
+     * and shows a celebration notification and confetti on first discovery.
+     */
+    function checkAndNotifyPersonalMilestone() {
+        const user = Auth.getCurrentUser();
+        if (!user || typeof Badges === 'undefined') return;
+
+        const status = Badges.getPlayerBadgeStatus(user.id);
+        if (!status || !status.currentMilestone || status.currentMilestone.threshold < 5) return;
+
+        const key = `ccc_seen_milestone_${user.id}_${status.currentMilestone.id}`;
+        if (!localStorage.getItem(key)) {
+            localStorage.setItem(key, 'true');
+            setTimeout(() => {
+                showToast(`🎉 Milestone Unlocked: You are a ${status.currentMilestone.title}! ${status.currentMilestone.icon}`);
+                if (Badges.triggerConfetti) Badges.triggerConfetti();
+            }, 600);
+        }
+    }
+
     /* ----------------------------------------------------------
        WHATSAPP HELPERS
     ---------------------------------------------------------- */
@@ -1087,7 +1263,7 @@ const App = (() => {
     function bindEvents() {
 
         /* --- Login --- */
-        document.getElementById('login-form').addEventListener('submit', (e) => {
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = document.getElementById('login-name').value.trim();
             const mobile = document.getElementById('login-mobile').value.trim();
@@ -1104,6 +1280,9 @@ const App = (() => {
             }
 
             const user = Auth.login(name, cleanMobile);
+            if (window.DB && DB.isLive && DB.isLive()) {
+                await DB.savePlayer(user).catch(() => {});
+            }
             showScreen('home');
             showToast(`Welcome, ${user.name}! 🏏`);
         });
@@ -1377,11 +1556,15 @@ const App = (() => {
         closeAddPlayerModal,
         handleAdminRemovePlayer,
         checkAndNotifyPersonalPromotion,
+        checkAndNotifyPersonalMilestone,
         getWhatsAppPlayerUrl,
         shareSquadWhatsApp,
         handleToggleLock,
         handleReorderPlayer,
         handleTransferPlayer,
+        handleOpenRegistrationNow,
+        formatCountdown,
+        formatOpensAtDate,
         toDateString
     };
 })();

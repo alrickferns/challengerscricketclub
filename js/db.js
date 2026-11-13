@@ -32,6 +32,14 @@ const DB = (() => {
 
                 // Setup realtime channel subscriptions
                 setupRealtime();
+
+                // Ensure current user is synced to cloud if missing
+                if (typeof Auth !== 'undefined' && Auth.getCurrentUser) {
+                    const cur = Auth.getCurrentUser();
+                    if (cur && cur.id) {
+                        savePlayer(cur).catch(() => {});
+                    }
+                }
             } catch (err) {
                 console.error('Supabase initialization error, using local fallback:', err);
                 isInitialized = false;
@@ -41,9 +49,31 @@ const DB = (() => {
         }
     }
 
+    let _syncMatchesTimer = null;
+    function debouncedFetchAndSyncMatches() {
+        if (_syncMatchesTimer) clearTimeout(_syncMatchesTimer);
+        _syncMatchesTimer = setTimeout(() => {
+            fetchAndSyncMatches();
+        }, 150);
+    }
+
+    let _syncPlayersTimer = null;
+    function debouncedFetchAndSyncPlayers() {
+        if (_syncPlayersTimer) clearTimeout(_syncPlayersTimer);
+        _syncPlayersTimer = setTimeout(() => {
+            fetchAndSyncPlayers();
+        }, 150);
+    }
+
     /** Setup Supabase Realtime Channel */
     function setupRealtime() {
         if (!isLive()) return;
+
+        // Clean up any stale subscription before reconnecting
+        if (realtimeChannel) {
+            try { client.removeChannel(realtimeChannel); } catch (e) {}
+            realtimeChannel = null;
+        }
 
         try {
             realtimeChannel = client
@@ -52,14 +82,14 @@ const DB = (() => {
                     'postgres_changes',
                     { event: '*', schema: 'public', table: 'matches' },
                     () => {
-                        fetchAndSyncMatches();
+                        debouncedFetchAndSyncMatches();
                     }
                 )
                 .on(
                     'postgres_changes',
                     { event: '*', schema: 'public', table: 'players' },
                     () => {
-                        fetchAndSyncPlayers();
+                        debouncedFetchAndSyncPlayers();
                     }
                 )
                 .subscribe((status) => {
@@ -79,6 +109,7 @@ const DB = (() => {
 
     let hasFormatColumn = null; // null = auto-detect, true = SQL column exists, false = fallback into turf
     let hasDraftColumn = null;  // null = auto-detect, true = SQL column exists, false = column missing in Supabase
+    let hasOpensAtColumn = null; // null = auto-detect, true = SQL column exists, false = fallback into draft jsonb
 
     /* ----------------------------------------------------------
        HELPERS: MAP BETWEEN JS CAMELCASE & SQL SNAKE_CASE
@@ -102,6 +133,16 @@ const DB = (() => {
         if (hasDraftColumn !== false && typeof m.draft !== 'undefined') {
             obj.draft = m.draft;
         }
+        if (hasOpensAtColumn !== false && m.opensAt) {
+            obj.opens_at = m.opensAt;
+        }
+        // Also persist opensAt in draft JSONB so it is 100% resilient across Supabase schema variants
+        if (m.opensAt) {
+            if (!obj.draft || typeof obj.draft !== 'object') {
+                obj.draft = {};
+            }
+            obj.draft.opensAt = m.opensAt;
+        }
         return obj;
     }
 
@@ -124,6 +165,11 @@ const DB = (() => {
             resolvedDraft = localMatch.draft;
         }
 
+        let opensAt = r.opens_at || (resolvedDraft && typeof resolvedDraft === 'object' ? resolvedDraft.opensAt : null) || null;
+        if (!opensAt && localMatch && localMatch.opensAt) {
+            opensAt = localMatch.opensAt;
+        }
+
         return {
             id: r.id,
             date: r.date,
@@ -136,6 +182,7 @@ const DB = (() => {
             playing: Array.isArray(r.playing) ? r.playing : [],
             waiting: Array.isArray(r.waiting) ? r.waiting : [],
             locked: Boolean(r.locked),
+            opensAt: opensAt,
             draft: resolvedDraft,
             createdAt: r.created_at
         };
@@ -179,6 +226,7 @@ const DB = (() => {
                 if (data.length > 0) {
                     hasDraftColumn = ('draft' in data[0]);
                     hasFormatColumn = ('format' in data[0]);
+                    hasOpensAtColumn = ('opens_at' in data[0]);
                 }
                 const matches = data.map(dbToMatch);
                 if (typeof Matches !== 'undefined' && Matches.save) {
@@ -199,7 +247,11 @@ const DB = (() => {
                         const matchIdInput = document.getElementById('add-player-match-id');
                         const activeMatchId = matchIdInput ? matchIdInput.value : null;
                         if (activeMatchId && matches.find(m => m.id === activeMatchId)) {
-                            App.showMatchDetail(activeMatchId);
+                            if (App.renderMatchDetail) {
+                                App.renderMatchDetail(activeMatchId);
+                            } else {
+                                App.showMatchDetail(activeMatchId);
+                            }
                         } else if (activeMatchId) {
                             App.showToast('This match has been removed.');
                             App.showScreen('home');
@@ -252,6 +304,36 @@ const DB = (() => {
         }
     }
 
+    /** Fetch a single player from Supabase on demand if missing from local cache */
+    async function fetchSinglePlayer(id) {
+        if (!isLive() || !id) return null;
+        try {
+            let query = client.from('players').select('*');
+            if (id.startsWith('p_')) {
+                const phone = id.slice(2);
+                query = query.or(`id.eq.${id},mobile.eq.${phone}`);
+            } else {
+                query = query.eq('id', id);
+            }
+            const { data, error } = await query.limit(1);
+            if (error || !data || data.length === 0) return null;
+            const player = dbToPlayer(data[0]);
+            if (typeof Auth !== 'undefined' && Auth.getPlayers && Auth.savePlayers) {
+                const players = Auth.getPlayers();
+                const idx = players.findIndex(p => p.id === player.id || (player.mobile && p.mobile === player.mobile));
+                if (idx !== -1) {
+                    players[idx] = player;
+                } else {
+                    players.push(player);
+                }
+                Auth.savePlayers(players);
+            }
+            return player;
+        } catch (e) {
+            return null;
+        }
+    }
+
     /* ----------------------------------------------------------
        MATCHES CRUD
     ---------------------------------------------------------- */
@@ -270,6 +352,9 @@ const DB = (() => {
             if (hasDraftColumn === false) {
                 delete payload.draft;
             }
+            if (hasOpensAtColumn === false) {
+                delete payload.opens_at;
+            }
             let { error } = await client.from('matches').upsert(payload);
             if (error && (error.code === 'PGRST204' || (error.message && error.message.toLowerCase().includes('format')))) {
                 // 'format' column not yet in Supabase table schema
@@ -286,9 +371,15 @@ const DB = (() => {
                 delete payload.draft;
                 const retry = await client.from('matches').upsert(payload);
                 if (retry.error) throw retry.error;
+            } else if (error && (error.code === 'PGRST204' || (error.message && error.message.toLowerCase().includes('opens_at')))) {
+                hasOpensAtColumn = false;
+                delete payload.opens_at;
+                const retry = await client.from('matches').upsert(payload);
+                if (retry.error) throw retry.error;
             } else if (!error) {
                 if (hasFormatColumn === null) hasFormatColumn = true;
                 if (hasDraftColumn === null && payload.draft !== undefined) hasDraftColumn = true;
+                if (hasOpensAtColumn === null && payload.opens_at !== undefined) hasOpensAtColumn = true;
             }
             return match;
         } catch (err) {
@@ -358,6 +449,17 @@ const DB = (() => {
         }
 
         try {
+            // Guard: ensure player is synced to Supabase players table before joining match
+            if (typeof Auth !== 'undefined') {
+                const curUser = Auth.getCurrentUser ? Auth.getCurrentUser() : null;
+                if (curUser && curUser.id === playerId) {
+                    await savePlayer(curUser).catch(() => {});
+                } else if (Auth.getPlayerById) {
+                    const p = Auth.getPlayerById(playerId);
+                    if (p) await savePlayer(p).catch(() => {});
+                }
+            }
+
             const { data: row, error } = await client
                 .from('matches')
                 .select('*')
@@ -371,6 +473,9 @@ const DB = (() => {
             const match = dbToMatch(row);
             if (match.locked) {
                 return { success: false, message: 'Squad is locked by admin' };
+            }
+            if (match.opensAt && new Date(match.opensAt).getTime() > Date.now()) {
+                return { success: false, message: 'Registration has not opened yet!' };
             }
 
             const playing = match.playing || [];
@@ -671,6 +776,7 @@ const DB = (() => {
         saveMatch,
         deleteMatch,
         savePlayer,
+        fetchSinglePlayer,
         joinMatch,
         leaveMatch,
         adminAddPlayer,

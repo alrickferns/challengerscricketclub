@@ -110,6 +110,9 @@ const Auth = (() => {
                 player.name = cleanName;
             }
             player.mobile = cleanMobile;
+            if (cleanMobile && targetId && player.id !== targetId) {
+                player.id = targetId;
+            }
             if (isPendingAdmin) player.isAdmin = true;
             savePlayers(players);
         } else {
@@ -184,6 +187,9 @@ const Auth = (() => {
         }
     }
 
+    // Track in-flight on-demand player fetches from Supabase
+    const _pendingPlayerFetches = new Set();
+
     /** Look up a player by ID (O(1) in-memory lookup with phone match fallback) */
     function getPlayerById(id) {
         if (!id) return null;
@@ -193,15 +199,44 @@ const Auth = (() => {
         const byId = _playersIdMap.get(id);
         if (byId) return byId;
 
+        // Fallback: check current logged-in user session
+        const curUser = getCurrentUser();
+        if (curUser && (curUser.id === id || (curUser.mobile && `p_${normalizePhone(curUser.mobile)}` === id))) {
+            return curUser;
+        }
+
         // Fallback: if id is 'p_<phone>' or raw phone
         if (id.startsWith('p_')) {
             const phone = id.slice(2);
-            return _playersPhoneMap.get(phone) || null;
+            const foundPhone = _playersPhoneMap.get(phone);
+            if (foundPhone) return foundPhone;
         }
         const directPhone = normalizePhone(id);
         if (directPhone && _playersPhoneMap.has(directPhone)) {
             return _playersPhoneMap.get(directPhone);
         }
+
+        // Self-healing fallback: on-demand fetch from Supabase if missing from cache
+        if (typeof window !== 'undefined' && window.DB && DB.isLive && DB.isLive() && !_pendingPlayerFetches.has(id)) {
+            _pendingPlayerFetches.add(id);
+            if (typeof DB.fetchSinglePlayer === 'function') {
+                DB.fetchSinglePlayer(id).then(fetched => {
+                    _pendingPlayerFetches.delete(id);
+                    if (fetched && window.App) {
+                        const detailScreen = document.getElementById('match-detail-screen');
+                        if (detailScreen && detailScreen.classList.contains('active')) {
+                            const matchIdInput = document.getElementById('add-player-match-id');
+                            const activeMatchId = matchIdInput ? matchIdInput.value : null;
+                            if (activeMatchId && App.renderMatchDetail) {
+                                App.renderMatchDetail(activeMatchId);
+                            }
+                        }
+                        if (App.renderMatchCards) App.renderMatchCards();
+                    }
+                }).catch(() => _pendingPlayerFetches.delete(id));
+            }
+        }
+
         return null;
     }
 
@@ -215,16 +250,23 @@ const Auth = (() => {
             const targetId = getPlayerIdForPhone(cleanMobile);
             const existing = players.find(p => normalizePhone(p.mobile) === cleanMobile || p.id === targetId);
             if (existing) {
+                if (targetId && existing.id !== targetId) {
+                    existing.id = targetId;
+                }
                 // Update to longer/better name if provided
                 if (trimmedName && trimmedName.length > (existing.name || '').length) {
                     existing.name = trimmedName;
-                    savePlayers(players);
-                    if (typeof window !== 'undefined' && window.DB && DB.isLive()) {
-                        DB.savePlayer(existing).catch(() => {});
-                    }
+                }
+                savePlayers(players);
+                if (typeof window !== 'undefined' && window.DB && DB.isLive()) {
+                    DB.savePlayer(existing).catch(() => {});
                 }
                 return existing;
             }
+        } else if (trimmedName) {
+            // Find existing guest with exact same name if no mobile provided
+            const existingByName = players.find(p => (p.name || '').trim().toLowerCase() === trimmedName.toLowerCase() && !p.mobile);
+            if (existingByName) return existingByName;
         }
 
         const newPlayer = {
@@ -300,15 +342,23 @@ const Auth = (() => {
                 });
                 savePlayers(dedupedPlayers);
 
-                // Update current user if redirected
+                // Update current user if redirected or not yet canonical
                 const curUser = getCurrentUser();
                 if (curUser) {
                     const curPhone = normalizePhone(curUser.mobile);
-                    if (curPhone && phoneMap.has(curPhone)) {
-                        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(phoneMap.get(curPhone)));
+                    if (curPhone) {
+                        const targetUser = phoneMap.get(curPhone) || curUser;
+                        targetUser.id = `p_${curPhone}`;
+                        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(targetUser));
+                        if (typeof window !== 'undefined' && window.DB && DB.isLive && DB.isLive()) {
+                            DB.savePlayer(targetUser).catch(() => {});
+                        }
                     } else if (idRedirectMap[curUser.id]) {
                         curUser.id = idRedirectMap[curUser.id];
                         localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(curUser));
+                        if (typeof window !== 'undefined' && window.DB && DB.isLive && DB.isLive()) {
+                            DB.savePlayer(curUser).catch(() => {});
+                        }
                     }
                 }
 

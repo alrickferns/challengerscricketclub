@@ -80,6 +80,7 @@ const Admin = (() => {
         const waitingCount = Array.isArray(match.waiting) ? match.waiting.length : 0;
         const maxPlayers = parseInt(match.maxPlayers, 10) || 22;
         const isPast = match.date && match.date < todayStr;
+        const isTeaser = match.opensAt && (new Date(match.opensAt).getTime() > Date.now());
         const fillPercent = Math.min(100, Math.round((playingCount / maxPlayers) * 100));
 
         if (isSpotlight) {
@@ -87,8 +88,8 @@ const Admin = (() => {
                 <div class="admin-spotlight-card" data-match-id="${match.id}">
                     <div class="spotlight-header">
                         <span class="spotlight-badge">⭐ NEXT UP MATCH</span>
-                        <div class="spotlight-status-tag ${match.locked ? 'locked' : 'open'}">
-                            ${match.locked ? '🔒 Squad Locked' : '🔓 Registration Open'}
+                        <div class="spotlight-status-tag ${match.locked ? 'locked' : (isTeaser ? 'teaser' : 'open')}">
+                            ${match.locked ? '🔒 Squad Locked' : (isTeaser ? `⏳ Opens ${formatOpensAtShort(match.opensAt)}` : '🔓 Registration Open')}
                         </div>
                     </div>
                     <div class="spotlight-body" onclick="Admin.openMatchSquad('${match.id}')" style="cursor:pointer;">
@@ -109,6 +110,11 @@ const Admin = (() => {
                                 onclick="Admin.openMatchSquad('${match.id}')">
                             👥 Manage Squad
                         </button>
+                        ${isTeaser ? `
+                        <button class="btn btn-sm btn-outline-gold" title="Open registration immediately"
+                                onclick="Admin.handleOpenRegistrationNow('${match.id}')">
+                            ⚡ Open Now
+                        </button>` : ''}
                         <button class="btn btn-sm ${match.locked ? 'btn-danger' : 'btn-outline-gold'}"
                                 onclick="Admin.handleToggleLock('${match.id}')">
                             ${match.locked ? '🔒 Unlock Squad' : '🔓 Lock Squad'}
@@ -132,6 +138,7 @@ const Admin = (() => {
                         ${dateStr}
                         ${isPast ? '<span class="count-tag wait" style="margin-left:6px; font-size:0.65rem;">Past</span>' : ''}
                         ${match.locked ? '<span class="count-tag wait" style="margin-left:6px; font-size:0.65rem; background:rgba(239,68,68,0.2); color:#fca5a5;">🔒 Locked</span>' : ''}
+                        ${isTeaser ? `<span class="count-tag" style="margin-left:6px; font-size:0.65rem; background:rgba(241,196,15,0.2); color:#f1c40f; border:1px solid rgba(241,196,15,0.4);">⏳ Opens ${formatOpensAtShort(match.opensAt)}</span>` : ''}
                     </div>
                     <div class="admin-match-details">${timeStr} · ${safeTurf} <span class="format-badge-sm">🏏 ${safeFormat}</span></div>
                     <div class="admin-match-count">
@@ -144,6 +151,11 @@ const Admin = (() => {
                             onclick="Admin.openMatchSquad('${match.id}')">
                         👥 Squad
                     </button>
+                    ${isTeaser ? `
+                    <button class="btn btn-sm btn-outline-gold" title="Open registration immediately"
+                            onclick="Admin.handleOpenRegistrationNow('${match.id}')">
+                        ⚡ Open Now
+                    </button>` : ''}
                     <button class="btn btn-sm btn-outline-gold" title="Edit Match Details"
                             onclick="Admin.openEditModal('${match.id}')">
                         ✏️ Edit
@@ -252,6 +264,34 @@ const Admin = (() => {
         App.showMatchDetail(matchId);
     }
 
+    function formatOpensAtShort(opensAtStr) {
+        if (!opensAtStr) return '';
+        try {
+            const d = new Date(opensAtStr);
+            return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        } catch (e) {
+            return opensAtStr;
+        }
+    }
+
+    /** Open registration immediately, removing teaser mode */
+    function handleOpenRegistrationNow(matchId) {
+        const updated = Matches.update(matchId, { opensAt: null });
+        if (updated) {
+            App.showToast('Registration is now open! 🏏');
+            renderAdminPanel();
+            if (window.App) {
+                if (App.renderTicker) App.renderTicker();
+                if (App.renderMatchCards) App.renderMatchCards();
+                if (App.renderDateStrip) App.renderDateStrip();
+                const detailScreen = document.getElementById('match-detail-screen');
+                if (detailScreen && detailScreen.classList.contains('active')) {
+                    App.renderMatchDetail(matchId);
+                }
+            }
+        }
+    }
+
     /** Toggle lock/unlock */
     async function handleToggleLock(matchId) {
         const match = (window.DB && DB.isLive())
@@ -302,6 +342,8 @@ const Admin = (() => {
         const formatInput = form.querySelector('#match-format');
         const format = formatInput ? (formatInput.value.trim() || 'Turf Match') : 'Turf Match';
         const maxPlayers = parseInt(form.querySelector('#match-max-players').value, 10);
+        const opensAtInput = form.querySelector('#match-opens-at');
+        const opensAt = opensAtInput && opensAtInput.value ? opensAtInput.value : null;
 
         if (!date || !startTime || !turf) {
             App.showToast('Please fill all required fields');
@@ -313,7 +355,7 @@ const Admin = (() => {
             return;
         }
 
-        Matches.create({ date, startTime, endTime, turf, format, maxPlayers });
+        Matches.create({ date, startTime, endTime, turf, format, maxPlayers, opensAt });
 
         // Reset form but keep default max players
         form.reset();
@@ -350,6 +392,10 @@ const Admin = (() => {
         document.getElementById('edit-match-turf').value = match.turf || '';
         document.getElementById('edit-match-format').value = match.format || 'Turf Match';
         document.getElementById('edit-match-max-players').value = match.maxPlayers || 22;
+        const opensAtInput = document.getElementById('edit-match-opens-at');
+        if (opensAtInput) {
+            opensAtInput.value = match.opensAt || '';
+        }
 
         modal.style.display = 'flex';
     }
@@ -371,6 +417,8 @@ const Admin = (() => {
         const turf = form.querySelector('#edit-match-turf').value.trim();
         const format = (form.querySelector('#edit-match-format').value || 'Turf Match').trim();
         const maxPlayers = parseInt(form.querySelector('#edit-match-max-players').value, 10);
+        const opensAtInput = form.querySelector('#edit-match-opens-at');
+        const opensAt = opensAtInput && opensAtInput.value ? opensAtInput.value : null;
 
         if (!date || !startTime || !turf) {
             App.showToast('Please fill all required fields');
@@ -389,7 +437,8 @@ const Admin = (() => {
             time: startTime,
             turf,
             format,
-            maxPlayers
+            maxPlayers,
+            opensAt
         });
 
         if (updated) {
@@ -488,6 +537,8 @@ const Admin = (() => {
         closeEditModal,
         handleEditMatch,
         handleToggleLock,
+        handleOpenRegistrationNow,
+        formatOpensAtShort,
         handleDelete,
         handleCreateMatch,
         setMinDate,

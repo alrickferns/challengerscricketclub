@@ -1149,6 +1149,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     color: var(--text-secondary);
     margin-bottom: 12px;
 }
+.match-card-turf span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
 .match-card-turf svg {
     color: var(--gold);
     flex-shrink: 0;
@@ -2715,8 +2721,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 @keyframes tickerSlide {
-    0%   { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
+    0%   { transform: translate3d(0, 0, 0); }
+    100% { transform: translate3d(-50%, 0, 0); }
 }
 
 .ticker-item {
@@ -4962,6 +4968,274 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .status-lock {
     color: var(--text-muted);
 }
+
+/* ============================================================
+   MILESTONE CELEBRATION BANNER & CONFETTI (POINT 7)
+   ============================================================ */
+.passport-celebration-banner {
+    margin: 14px 0 4px;
+    animation: celebrationPop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.passport-celebration-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
+.passport-celebration-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+    animation: celebrationShimmer 3s infinite ease-in-out;
+}
+
+@keyframes celebrationShimmer {
+    0% { left: -100%; }
+    40%, 100% { left: 160%; }
+}
+
+@keyframes celebrationPop {
+    0% { transform: scale(0.92); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.celebration-badge-icon {
+    font-size: 2.1rem;
+    line-height: 1;
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
+    flex-shrink: 0;
+    animation: celebrationBounce 2s infinite ease-in-out;
+}
+
+@keyframes celebrationBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+
+.celebration-badge-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.celebration-badge-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2px;
+}
+
+.celebration-badge-tag {
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.celebration-caps-count {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    background: rgba(0, 0, 0, 0.4);
+    padding: 2px 6px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.celebration-milestone-name {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+}
+
+.celebration-milestone-desc {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    margin: 2px 0 0;
+    line-height: 1.3;
+}
+
+/* Reusable Confetti Canvas for Passport & Celebrations */
+.passport-confetti-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 10005;
+}
+
+/* ============================================================
+   TEASER MODE & LIVE COUNTDOWN TIMER (SCHEDULED GO-LIVE)
+   ============================================================ */
+.match-card.match-card-teaser {
+    border-color: rgba(241, 196, 15, 0.45);
+    background: linear-gradient(145deg, rgba(28, 48, 30, 0.92) 0%, rgba(18, 28, 14, 0.96) 100%);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 16px rgba(241, 196, 15, 0.12);
+}
+
+.match-card.match-card-teaser::before {
+    background: linear-gradient(180deg, #f1c40f 0%, #e67e22 100%);
+}
+
+.match-teaser-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(241, 196, 15, 0.16);
+    border: 1px solid rgba(241, 196, 15, 0.45);
+    color: #f1c40f;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.match-teaser-chip .teaser-icon {
+    font-size: 0.78rem;
+    animation: teaserHourglassPulse 2s infinite ease-in-out;
+}
+
+@keyframes teaserHourglassPulse {
+    0%, 100% { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(180deg) scale(1.1); }
+}
+
+.teaser-gold {
+    color: #f1c40f !important;
+    font-weight: 800 !important;
+}
+
+.progress-bar-teaser {
+    background: rgba(241, 196, 15, 0.12);
+    border-color: rgba(241, 196, 15, 0.25);
+}
+
+.progress-fill-teaser {
+    background: linear-gradient(90deg, #f1c40f, #e67e22) !important;
+}
+
+/* Detail Screen Teaser Card */
+.teaser-countdown-card {
+    background: linear-gradient(145deg, rgba(32, 38, 18, 0.9) 0%, rgba(18, 22, 10, 0.96) 100%);
+    border: 1.5px solid rgba(241, 196, 15, 0.55);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    margin-bottom: 12px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 0 20px rgba(241, 196, 15, 0.18);
+    animation: teaserCardPop 0.4s ease-out;
+}
+
+.teaser-countdown-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(241, 196, 15, 0.15), transparent);
+    animation: teaserShimmer 3.5s infinite ease-in-out;
+    pointer-events: none;
+}
+
+@keyframes teaserShimmer {
+    0% { left: -100%; }
+    40%, 100% { left: 160%; }
+}
+
+@keyframes teaserCardPop {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.teaser-countdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.teaser-badge {
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #f1c40f;
+    background: rgba(241, 196, 15, 0.18);
+    padding: 3px 7px;
+    border-radius: 4px;
+    border: 1px solid rgba(241, 196, 15, 0.35);
+}
+
+.teaser-open-date {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.teaser-timer-display {
+    font-size: 1.85rem;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: 0.06em;
+    font-variant-numeric: tabular-nums;
+    font-family: 'Inter', -apple-system, sans-serif;
+    margin: 8px 0;
+    text-shadow: 0 2px 14px rgba(241, 196, 15, 0.5);
+}
+
+.teaser-note {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.35;
+}
+
+/* Teaser Button */
+.btn-teaser {
+    background: rgba(241, 196, 15, 0.14) !important;
+    border: 1.5px dashed rgba(241, 196, 15, 0.6) !important;
+    color: #f1c40f !important;
+    font-weight: 800 !important;
+    cursor: not-allowed !important;
+    opacity: 0.95;
+    letter-spacing: 0.02em;
+}
+
+/* Squad Header Status Tag in Teaser Mode */
+.squad-status.teaser {
+    background: rgba(241, 196, 15, 0.18);
+    color: #f1c40f;
+    border: 1px solid rgba(241, 196, 15, 0.45);
+}
+
+/* Spotlight Header Status Tag in Teaser Mode */
+.spotlight-status-tag.teaser {
+    background: rgba(241, 196, 15, 0.18);
+    color: #f1c40f;
+    border: 1px solid rgba(241, 196, 15, 0.45);
+}
+
+
 
 
 
