@@ -1124,7 +1124,8 @@ const App = (() => {
         if (!localStorage.getItem(key)) {
             localStorage.setItem(key, 'true');
             setTimeout(() => {
-                showToast(`🎉 Milestone Unlocked: You are a ${status.currentMilestone.title}! ${status.currentMilestone.icon}`);
+                const article = /^[AEIOU]/i.test(status.currentMilestone.title) ? 'an' : 'a';
+                showToast(`🎉 Milestone Unlocked: You are ${article} ${status.currentMilestone.title}! ${status.currentMilestone.icon}`);
                 if (Badges.triggerConfetti) Badges.triggerConfetti();
             }, 600);
         }

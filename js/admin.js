@@ -108,7 +108,7 @@ const Admin = (() => {
                     <div class="admin-match-actions spotlight-actions">
                         <button class="btn btn-sm btn-primary" title="Manage Squad &amp; Players"
                                 onclick="Admin.openMatchSquad('${match.id}')">
-                            👥 Manage Squad
+                            👥 Squad
                         </button>
                         ${isTeaser ? `
                         <button class="btn btn-sm btn-outline-gold" title="Open registration immediately"

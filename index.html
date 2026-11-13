@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="css/styles.css?v=10.4">
+    <link rel="stylesheet" href="css/styles.css?v=10.5">
 </head>
 
 <body>
@@ -30,7 +30,7 @@
             <div class="login-bg-pattern"></div>
             <div class="login-container">
                 <div class="login-logo-wrap">
-                    <img src="logo.png" alt="Challengers Cricket Club" class="login-logo" id="login-logo">
+                    <img src="logo.png" alt="Challengers Cricket Club" class="login-logo" id="login-logo" width="124" height="124">
                 </div>
                 <div class="login-card">
                     <h1 class="login-title">Welcome Back,<br><span class="gold">Challenger</span></h1>
@@ -71,7 +71,7 @@
         <div id="home-screen" class="screen">
             <header class="top-bar" id="top-bar">
                 <div class="top-bar-left">
-                    <img src="logo.png" alt="CCC" class="top-bar-logo">
+                    <img src="logo.png" alt="CCC" class="top-bar-logo" width="40" height="40">
                     <div class="top-bar-info">
                         <span class="top-bar-club">Challengers Cricket Club</span>
                         <span class="top-bar-user" id="top-bar-user-name"></span>
@@ -479,7 +479,9 @@
                     <button type="button" id="confirm-ok" class="btn btn-danger">Confirm</button>
                 </div>
             </div>
-            <!-- ==================== PLAYER PASSPORT & BADGES MODAL ==================== -->
+        </div>
+
+        <!-- ==================== PLAYER PASSPORT & BADGES MODAL ==================== -->
             <div id="player-passport-modal" class="modal-overlay" style="display:none;"
                 onclick="if(event.target.id==='player-passport-modal')Badges.closePassportModal()">
                 <div class="modal passport-modal">
@@ -560,15 +562,15 @@
 
         <!-- Supabase Cloud Database (PostgreSQL + Real-time sync across players' devices) -->
         <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-        <script src="js/supabase-config.js?v=10.4"></script>
-        <script src="js/db.js?v=10.4"></script>
-        <script src="js/auth.js?v=10.4"></script>
-        <script src="js/matches.js?v=10.4"></script>
-        <script src="js/badges.js?v=10.4"></script>
-        <script src="js/squad.js?v=10.4"></script>
-        <script src="js/draft.js?v=10.4"></script>
-        <script src="js/admin.js?v=10.4"></script>
-        <script src="js/app.js?v=10.4"></script>
+        <script src="js/supabase-config.js?v=10.5"></script>
+        <script src="js/db.js?v=10.5"></script>
+        <script src="js/auth.js?v=10.5"></script>
+        <script src="js/matches.js?v=10.5"></script>
+        <script src="js/badges.js?v=10.5"></script>
+        <script src="js/squad.js?v=10.5"></script>
+        <script src="js/draft.js?v=10.5"></script>
+        <script src="js/admin.js?v=10.5"></script>
+        <script src="js/app.js?v=10.5"></script>
 </body>
 
 </html>

@@ -345,7 +345,8 @@ input, button, textarea { font-family: inherit; }
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator,
-input[type="time"]::-webkit-calendar-picker-indicator {
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     filter: invert(0.8) sepia(100%) saturate(300%) hue-rotate(5deg);
     cursor: pointer;
     opacity: 0.85;
@@ -1068,6 +1069,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     border: 1px solid rgba(201,168,76,0.28);
     box-shadow: 0 0 8px rgba(201,168,76,0.1);
     width: fit-content;
+    font-variant-numeric: tabular-nums;
 }
 
 .match-format-text {
@@ -1198,6 +1200,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
 /* Slot badges */
@@ -1325,7 +1328,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 .detail-content {
     padding: 16px;
-    padding-bottom: calc(24px + var(--safe-bottom));
+    padding-bottom: calc(36px + var(--safe-bottom));
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -1988,7 +1991,17 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 .spotlight-actions {
-    margin-top: 4px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-top: 10px;
+    width: 100%;
+}
+
+@media (min-width: 480px) {
+    .spotlight-actions {
+        grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
+    }
 }
 
 /* Draft Turn Countdown Timer Bar */
@@ -5103,6 +5116,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     font-size: 0.68rem;
     font-weight: 800;
     letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
 }
 
 .match-teaser-chip .teaser-icon {
