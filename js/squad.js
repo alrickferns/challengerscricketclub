@@ -35,7 +35,7 @@ const Squad = (() => {
         if (!match) return { success: false, message: 'Match not found' };
         if (match.locked) return { success: false, message: 'Squad is locked by admin' };
         if (match.opensAt && new Date(match.opensAt).getTime() > Date.now()) {
-            return { success: false, message: 'Registration has not opened yet!' };
+            return { success: false, reason: 'teaser_mode', message: 'Registration has not opened yet!' };
         }
 
         // Already in? (Guards against duplicate IDs and duplicate phone numbers)

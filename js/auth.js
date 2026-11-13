@@ -33,6 +33,27 @@ const Auth = (() => {
         }
     }
 
+    /** Safe sessionStorage helpers to protect against privacy mode blocks */
+    function safeSessionGet(key) {
+        try {
+            return (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem(key) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function safeSessionSet(key, val) {
+        try {
+            if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(key, val);
+        } catch (e) {}
+    }
+
+    function safeSessionRemove(key) {
+        try {
+            if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(key);
+        } catch (e) {}
+    }
+
     // In-memory cache & fast lookup maps to prevent expensive repeated JSON parsing
     let _playersCache = null;
     let _playersIdMap = new Map();
@@ -102,7 +123,7 @@ const Auth = (() => {
             return (cleanMobile && pPhone === cleanMobile) || p.id === targetId;
         });
 
-        const isPendingAdmin = sessionStorage.getItem(ADMIN_PENDING_KEY) === 'true';
+        const isPendingAdmin = safeSessionGet(ADMIN_PENDING_KEY) === 'true';
 
         if (player) {
             // Returning player — update name to full name if provided, ensure canonical ID and phone
@@ -129,7 +150,7 @@ const Auth = (() => {
         }
 
         // Clear pending admin flag
-        sessionStorage.removeItem(ADMIN_PENDING_KEY);
+        safeSessionRemove(ADMIN_PENDING_KEY);
 
         // Save current session
         localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(player));
@@ -148,7 +169,7 @@ const Auth = (() => {
     /** Log out current user */
     function logout() {
         localStorage.removeItem(CURRENT_USER_KEY);
-        sessionStorage.removeItem(ADMIN_PENDING_KEY);
+        safeSessionRemove(ADMIN_PENDING_KEY);
     }
 
     /** Check if current user is admin */
@@ -164,7 +185,7 @@ const Auth = (() => {
 
     /** Set the pending admin flag (used before login) */
     function setPendingAdmin() {
-        sessionStorage.setItem(ADMIN_PENDING_KEY, 'true');
+        safeSessionSet(ADMIN_PENDING_KEY, 'true');
     }
 
     /** Grant admin to currently logged-in user */
@@ -375,6 +396,7 @@ const Auth = (() => {
         savePlayers,
         invalidatePlayerCache,
         getCurrentUser,
+        isLoggedIn: () => getCurrentUser() !== null,
         login,
         logout,
         isAdmin,
