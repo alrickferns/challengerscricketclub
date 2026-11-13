@@ -133,15 +133,23 @@ const DB = (() => {
         if (hasDraftColumn !== false && typeof m.draft !== 'undefined') {
             obj.draft = m.draft;
         }
-        if (hasOpensAtColumn !== false && m.opensAt) {
-            obj.opens_at = m.opensAt;
+
+        const canonicalOpensAt = (typeof Matches !== 'undefined' && Matches.normalizeOpensAt)
+            ? Matches.normalizeOpensAt(m.opensAt)
+            : m.opensAt;
+
+        if (hasOpensAtColumn !== false) {
+            obj.opens_at = canonicalOpensAt || null;
         }
+
         // Also persist opensAt in draft JSONB so it is 100% resilient across Supabase schema variants
-        if (m.opensAt) {
+        if (canonicalOpensAt) {
             if (!obj.draft || typeof obj.draft !== 'object') {
                 obj.draft = {};
             }
-            obj.draft.opensAt = m.opensAt;
+            obj.draft.opensAt = canonicalOpensAt;
+        } else if (obj.draft && typeof obj.draft === 'object') {
+            delete obj.draft.opensAt;
         }
         return obj;
     }
@@ -165,10 +173,24 @@ const DB = (() => {
             resolvedDraft = localMatch.draft;
         }
 
-        let opensAt = r.opens_at || (resolvedDraft && typeof resolvedDraft === 'object' ? resolvedDraft.opensAt : null) || null;
-        if (!opensAt && localMatch && localMatch.opensAt) {
-            opensAt = localMatch.opensAt;
+        let rawOpensAt = r.opens_at || null;
+        if (!rawOpensAt && resolvedDraft) {
+            if (typeof resolvedDraft === 'object' && resolvedDraft.opensAt) {
+                rawOpensAt = resolvedDraft.opensAt;
+            } else if (typeof resolvedDraft === 'string') {
+                try {
+                    const parsedDraft = JSON.parse(resolvedDraft);
+                    if (parsedDraft && parsedDraft.opensAt) rawOpensAt = parsedDraft.opensAt;
+                } catch (e) {}
+            }
         }
+        if (!rawOpensAt && localMatch && localMatch.opensAt) {
+            rawOpensAt = localMatch.opensAt;
+        }
+
+        const opensAt = (typeof Matches !== 'undefined' && Matches.normalizeOpensAt)
+            ? Matches.normalizeOpensAt(rawOpensAt)
+            : rawOpensAt;
 
         return {
             id: r.id,
@@ -474,8 +496,11 @@ const DB = (() => {
             if (match.locked) {
                 return { success: false, message: 'Squad is locked by admin' };
             }
-            if (match.opensAt && new Date(match.opensAt).getTime() > Date.now()) {
-                return { success: false, message: 'Registration has not opened yet!' };
+            const isTeaser = (typeof Matches !== 'undefined' && Matches.isTeaser)
+                ? Matches.isTeaser(match)
+                : (match.opensAt && (new Date(match.opensAt).getTime() > Date.now()));
+            if (isTeaser) {
+                return { success: false, reason: 'teaser_mode', message: 'Registration has not opened yet!' };
             }
 
             const playing = match.playing || [];

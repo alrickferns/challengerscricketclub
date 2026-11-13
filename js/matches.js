@@ -14,6 +14,71 @@ const Matches = (() => {
         }
     }
 
+    /** Cross-browser robust date parser (WebKit/Safari, Chrome, Firefox & Edge compatible) */
+    function parseDateSafe(str) {
+        if (!str) return null;
+        if (str instanceof Date) return isNaN(str.getTime()) ? null : str;
+        if (typeof str === 'number') {
+            const d = new Date(str);
+            return isNaN(d.getTime()) ? null : d;
+        }
+        if (typeof str !== 'string') return null;
+        str = str.trim();
+        if (!str) return null;
+
+        // Try standard parse first
+        let d = new Date(str);
+        if (!isNaN(d.getTime())) return d;
+
+        // If string is YYYY-MM-DDTHH:mm, append :00 seconds
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(str)) {
+            d = new Date(str + ':00');
+            if (!isNaN(d.getTime())) return d;
+        }
+
+        // Manual extraction for strict Safari/WebKit fallback
+        const match = str.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+        if (match) {
+            d = new Date(
+                parseInt(match[1], 10),
+                parseInt(match[2], 10) - 1,
+                parseInt(match[3], 10),
+                parseInt(match[4], 10),
+                parseInt(match[5], 10),
+                match[6] ? parseInt(match[6], 10) : 0
+            );
+            if (!isNaN(d.getTime())) return d;
+        }
+        return null;
+    }
+
+    /** Normalize opensAt to canonical ISO string */
+    function normalizeOpensAt(val) {
+        if (!val) return null;
+        const d = parseDateSafe(val);
+        return d ? d.toISOString() : null;
+    }
+
+    /** Format date string into local YYYY-MM-DDTHH:mm for input[type="datetime-local"] */
+    function toDatetimeLocalValue(isoOrDateStr) {
+        const d = parseDateSafe(isoOrDateStr);
+        if (!d) return '';
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        return `${y}-${m}-${day}T${hh}:${mm}`;
+    }
+
+    /** Robust teaser check */
+    function isTeaser(match) {
+        if (!match || !match.opensAt) return false;
+        const d = parseDateSafe(match.opensAt);
+        if (!d) return false;
+        return d.getTime() > Date.now();
+    }
+
     // In-memory cache & fast lookup map
     let _matchesCache = null;
     let _matchesIdMap = new Map();
@@ -83,7 +148,7 @@ const Matches = (() => {
             playing: [],
             waiting: [],
             locked: false,
-            opensAt: data.opensAt ? data.opensAt : null,
+            opensAt: data.opensAt ? normalizeOpensAt(data.opensAt) : null,
             createdAt: new Date().toISOString()
         };
         matches.push(match);
@@ -102,7 +167,13 @@ const Matches = (() => {
         const matches = getAll();
         const idx = matches.findIndex(m => m.id === id);
         if (idx === -1) return null;
-        matches[idx] = { ...matches[idx], ...updates };
+        
+        const cleanUpdates = { ...updates };
+        if ('opensAt' in cleanUpdates) {
+            cleanUpdates.opensAt = cleanUpdates.opensAt ? normalizeOpensAt(cleanUpdates.opensAt) : null;
+        }
+
+        matches[idx] = { ...matches[idx], ...cleanUpdates };
         save(matches);
 
         // Sync to cloud if live
@@ -171,7 +242,11 @@ const Matches = (() => {
         remove,
         getUpcoming,
         getMatchesForDate,
-        getMatchDates
+        getMatchDates,
+        parseDateSafe,
+        normalizeOpensAt,
+        toDatetimeLocalValue,
+        isTeaser
     };
 })();
 

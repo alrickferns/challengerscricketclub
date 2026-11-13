@@ -207,8 +207,13 @@ const App = (() => {
             const emptyCount = Math.max(0, match.maxPlayers - playingCount);
             const fillPercent = Math.min(100, (playingCount / match.maxPlayers) * 100);
 
-            const isTeaser = match.opensAt && (new Date(match.opensAt).getTime() > Date.now());
-            const countdownRemainingMs = isTeaser ? (new Date(match.opensAt).getTime() - Date.now()) : 0;
+            const isTeaser = (typeof Matches !== 'undefined' && Matches.isTeaser)
+                ? Matches.isTeaser(match)
+                : (match.opensAt && (new Date(match.opensAt).getTime() > Date.now()));
+            const teaserDate = (typeof Matches !== 'undefined' && Matches.parseDateSafe)
+                ? Matches.parseDateSafe(match.opensAt)
+                : (match.opensAt ? new Date(match.opensAt) : null);
+            const countdownRemainingMs = (isTeaser && teaserDate) ? (teaserDate.getTime() - Date.now()) : 0;
             const countdownStr = isTeaser ? formatCountdown(countdownRemainingMs) : '';
 
             const playerStatus = Squad.getPlayerStatus(match.id, user.id);
@@ -499,8 +504,13 @@ const App = (() => {
                 </div>`
             : '';
 
-        const isTeaser = match.opensAt && (new Date(match.opensAt).getTime() > Date.now());
-        const teaserRemainingMs = isTeaser ? (new Date(match.opensAt).getTime() - Date.now()) : 0;
+        const isTeaser = (typeof Matches !== 'undefined' && Matches.isTeaser)
+            ? Matches.isTeaser(match)
+            : (match.opensAt && (new Date(match.opensAt).getTime() > Date.now()));
+        const teaserDate = (typeof Matches !== 'undefined' && Matches.parseDateSafe)
+            ? Matches.parseDateSafe(match.opensAt)
+            : (match.opensAt ? new Date(match.opensAt) : null);
+        const teaserRemainingMs = (isTeaser && teaserDate) ? (teaserDate.getTime() - Date.now()) : 0;
         const teaserCountdownStr = isTeaser ? formatCountdown(teaserRemainingMs) : '';
 
         // Action button
@@ -830,7 +840,10 @@ const App = (() => {
     function formatOpensAtDate(opensAtStr) {
         if (!opensAtStr) return '';
         try {
-            const d = new Date(opensAtStr);
+            const d = (typeof Matches !== 'undefined' && Matches.parseDateSafe)
+                ? Matches.parseDateSafe(opensAtStr)
+                : new Date(opensAtStr);
+            if (!d || isNaN(d.getTime())) return opensAtStr;
             const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
             const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
             return `${dateStr} at ${timeStr}`;
@@ -875,7 +888,11 @@ const App = (() => {
 
             matches.forEach(m => {
                 if (!m.opensAt) return;
-                const targetTime = new Date(m.opensAt).getTime();
+                const targetDate = (typeof Matches !== 'undefined' && Matches.parseDateSafe)
+                    ? Matches.parseDateSafe(m.opensAt)
+                    : new Date(m.opensAt);
+                if (!targetDate || isNaN(targetDate.getTime())) return;
+                const targetTime = targetDate.getTime();
                 const diff = targetTime - now;
 
                 if (diff > 0) {

@@ -80,7 +80,9 @@ const Admin = (() => {
         const waitingCount = Array.isArray(match.waiting) ? match.waiting.length : 0;
         const maxPlayers = parseInt(match.maxPlayers, 10) || 22;
         const isPast = match.date && match.date < todayStr;
-        const isTeaser = match.opensAt && (new Date(match.opensAt).getTime() > Date.now());
+        const isTeaser = (typeof Matches !== 'undefined' && Matches.isTeaser)
+            ? Matches.isTeaser(match)
+            : (match.opensAt && (new Date(match.opensAt).getTime() > Date.now()));
         const fillPercent = Math.min(100, Math.round((playingCount / maxPlayers) * 100));
 
         if (isSpotlight) {
@@ -117,7 +119,7 @@ const Admin = (() => {
                         </button>` : ''}
                         <button class="btn btn-sm ${match.locked ? 'btn-danger' : 'btn-outline-gold'}"
                                 onclick="Admin.handleToggleLock('${match.id}')">
-                            ${match.locked ? '🔒 Unlock Squad' : '🔓 Lock Squad'}
+                            ${match.locked ? '🔓 Unlock Squad' : '🔒 Lock Squad'}
                         </button>
                         <button class="btn btn-sm btn-outline" title="Open Draft War Room"
                                 onclick="Draft.openDraftRoom('${match.id}')">
@@ -162,7 +164,7 @@ const Admin = (() => {
                     </button>
                     <button class="btn btn-sm ${match.locked ? 'btn-danger' : 'btn-outline'}"
                             onclick="Admin.handleToggleLock('${match.id}')">
-                        ${match.locked ? '🔒 Locked' : '🔓 Open'}
+                        ${match.locked ? '🔓 Unlock Squad' : '🔒 Lock Squad'}
                     </button>
                     <button class="btn btn-sm btn-ghost-danger" title="Delete Match"
                             onclick="Admin.handleDelete('${match.id}')">
@@ -267,7 +269,10 @@ const Admin = (() => {
     function formatOpensAtShort(opensAtStr) {
         if (!opensAtStr) return '';
         try {
-            const d = new Date(opensAtStr);
+            const d = (typeof Matches !== 'undefined' && Matches.parseDateSafe)
+                ? Matches.parseDateSafe(opensAtStr)
+                : new Date(opensAtStr);
+            if (!d || isNaN(d.getTime())) return opensAtStr;
             return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
         } catch (e) {
             return opensAtStr;
@@ -343,7 +348,9 @@ const Admin = (() => {
         const format = formatInput ? (formatInput.value.trim() || 'Turf Match') : 'Turf Match';
         const maxPlayers = parseInt(form.querySelector('#match-max-players').value, 10);
         const opensAtInput = form.querySelector('#match-opens-at');
-        const opensAt = opensAtInput && opensAtInput.value ? opensAtInput.value : null;
+        const opensAt = opensAtInput && opensAtInput.value
+            ? ((typeof Matches !== 'undefined' && Matches.normalizeOpensAt) ? Matches.normalizeOpensAt(opensAtInput.value) : opensAtInput.value)
+            : null;
 
         if (!date || !startTime || !turf) {
             App.showToast('Please fill all required fields');
@@ -394,7 +401,9 @@ const Admin = (() => {
         document.getElementById('edit-match-max-players').value = match.maxPlayers || 22;
         const opensAtInput = document.getElementById('edit-match-opens-at');
         if (opensAtInput) {
-            opensAtInput.value = match.opensAt || '';
+            opensAtInput.value = (typeof Matches !== 'undefined' && Matches.toDatetimeLocalValue)
+                ? Matches.toDatetimeLocalValue(match.opensAt)
+                : (match.opensAt || '');
         }
 
         modal.style.display = 'flex';
@@ -418,7 +427,9 @@ const Admin = (() => {
         const format = (form.querySelector('#edit-match-format').value || 'Turf Match').trim();
         const maxPlayers = parseInt(form.querySelector('#edit-match-max-players').value, 10);
         const opensAtInput = form.querySelector('#edit-match-opens-at');
-        const opensAt = opensAtInput && opensAtInput.value ? opensAtInput.value : null;
+        const opensAt = opensAtInput && opensAtInput.value
+            ? ((typeof Matches !== 'undefined' && Matches.normalizeOpensAt) ? Matches.normalizeOpensAt(opensAtInput.value) : opensAtInput.value)
+            : null;
 
         if (!date || !startTime || !turf) {
             App.showToast('Please fill all required fields');

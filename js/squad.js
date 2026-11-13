@@ -34,7 +34,10 @@ const Squad = (() => {
         const match = Matches.getById(matchId);
         if (!match) return { success: false, message: 'Match not found' };
         if (match.locked) return { success: false, message: 'Squad is locked by admin' };
-        if (match.opensAt && new Date(match.opensAt).getTime() > Date.now()) {
+        const isTeaser = (typeof Matches !== 'undefined' && Matches.isTeaser)
+            ? Matches.isTeaser(match)
+            : (match.opensAt && (new Date(match.opensAt).getTime() > Date.now()));
+        if (isTeaser) {
             return { success: false, reason: 'teaser_mode', message: 'Registration has not opened yet!' };
         }
 
