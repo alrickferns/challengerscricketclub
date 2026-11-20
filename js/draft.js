@@ -566,7 +566,7 @@ const Draft = (() => {
      */
     async function copyWhatsAppSquadMessage(matchId) {
         const match = Matches.getById(matchId);
-        if (!match || !match.draft) return;
+        if (!match || !match.draft || !Array.isArray(match.draft.teams)) return;
         const msg = formatWhatsAppTeamsMessage(match, match.draft);
 
         try {
@@ -599,7 +599,7 @@ const Draft = (() => {
      */
     async function shareToWhatsAppGroup(matchId) {
         const match = Matches.getById(matchId);
-        if (!match || !match.draft) return;
+        if (!match || !match.draft || !Array.isArray(match.draft.teams)) return;
         const msg = formatWhatsAppTeamsMessage(match, match.draft);
         if (!msg) return;
 
@@ -724,13 +724,22 @@ const Draft = (() => {
             subTitle.textContent = `${dateStr} · ${match.turf}`;
         }
 
-        const draft = match.draft;
+        let draft = match.draft;
+        if (typeof draft === 'string') {
+            try {
+                draft = JSON.parse(draft);
+            } catch (e) {
+                draft = null;
+            }
+        }
 
-        if (!draft || draft.status !== 'in_progress') {
+        const hasActiveDraft = Boolean(draft && typeof draft === 'object' && draft.status && Array.isArray(draft.teams) && draft.teams.length > 0);
+
+        if (!hasActiveDraft || draft.status !== 'in_progress') {
             stopTurnTimer();
         }
 
-        if (!draft) {
+        if (!hasActiveDraft || draft.status === 'setup') {
             // Need setup
             renderSetupView(match, container);
         } else if (draft.status === 'toss') {
@@ -742,6 +751,9 @@ const Draft = (() => {
         } else if (draft.status === 'completed') {
             // Completed & ready to share / edit / redraw
             renderCompletedView(match, draft, container);
+        } else {
+            // Safe fallback
+            renderSetupView(match, container);
         }
     }
 

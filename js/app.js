@@ -610,22 +610,32 @@ const App = (() => {
 
 
 
-            ${(match.locked && !match.draft) ? `
-                <div class="detail-card draft-launch-card">
-                    <div class="draft-launch-inner">
-                        <div class="draft-launch-icon">⚔️</div>
-                        <div class="draft-launch-text">
-                            <strong>Team Draft War Room</strong>
-                            <span>Squad locked! Configure captains &amp; flip coin toss</span>
-                        </div>
-                        <button class="btn btn-sm btn-gold" onclick="Draft.openDraftRoom('${match.id}')">
-                            ⚔️ Launch Draft
-                        </button>
-                    </div>
-                </div>
-            ` : ''}
-
-            ${(typeof window.Draft !== 'undefined' && match.draft && Draft.renderMatchTeamsInDetails) ? Draft.renderMatchTeamsInDetails(match) : ''}
+            ${(() => {
+                let d = match.draft;
+                if (typeof d === 'string') {
+                    try { d = JSON.parse(d); } catch (e) { d = null; }
+                }
+                const hasActiveDraft = Boolean(d && typeof d === 'object' && d.status && Array.isArray(d.teams) && d.teams.length > 0);
+                if (match.locked && !hasActiveDraft) {
+                    return `
+                        <div class="detail-card draft-launch-card">
+                            <div class="draft-launch-inner">
+                                <div class="draft-launch-icon">⚔️</div>
+                                <div class="draft-launch-text">
+                                    <strong>Team Draft War Room</strong>
+                                    <span>Squad locked! Configure captains &amp; flip coin toss</span>
+                                </div>
+                                <button class="btn btn-sm btn-gold" onclick="Draft.openDraftRoom('${match.id}')">
+                                    ⚔️ Launch Draft
+                                </button>
+                            </div>
+                        </div>`;
+                }
+                if (hasActiveDraft && typeof window.Draft !== 'undefined' && Draft.renderMatchTeamsInDetails) {
+                    return Draft.renderMatchTeamsInDetails(match);
+                }
+                return '';
+            })()}
 
             <div class="detail-card">
                 <div class="detail-squad-header">
