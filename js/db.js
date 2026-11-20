@@ -150,6 +150,9 @@ const DB = (() => {
             obj.draft.opensAt = canonicalOpensAt;
         } else if (obj.draft && typeof obj.draft === 'object') {
             delete obj.draft.opensAt;
+            if (Object.keys(obj.draft).length === 0) {
+                obj.draft = null;
+            }
         }
         return obj;
     }
@@ -171,6 +174,9 @@ const DB = (() => {
             resolvedDraft = r.draft;
         } else if (localMatch && localMatch.draft) {
             resolvedDraft = localMatch.draft;
+        }
+        if (resolvedDraft && typeof resolvedDraft === 'object' && Object.keys(resolvedDraft).length === 0) {
+            resolvedDraft = null;
         }
 
         let rawOpensAt = r.opens_at || null;

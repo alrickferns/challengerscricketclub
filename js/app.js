@@ -649,7 +649,7 @@ const App = (() => {
                         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                             <button class="btn btn-xs ${match.locked ? 'btn-danger' : 'btn-outline'}"
                                     onclick="App.handleToggleLock('${match.id}')" title="${match.locked ? 'Unlock squad for joins/leaves' : 'Lock squad to launch draft'}">
-                                ${match.locked ? '🔒 Locked' : '🔓 Open'}
+                                ${match.locked ? '🔓 Unlock Squad' : '🔒 Lock Squad'}
                             </button>
                             <button class="btn btn-xs" style="background:rgba(37,211,102,0.15); border:1px solid rgba(37,211,102,0.4); color:#25d366; font-weight:700;"
                                     onclick="App.shareSquadWhatsApp('${match.id}')" title="Share squad list to WhatsApp group">

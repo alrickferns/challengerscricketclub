@@ -927,6 +927,11 @@ const Draft = (() => {
 
     /** 2. TOSS VIEW: 2 Teams (3D Coin Flip) or 3+ Teams (Spin the Wheel) */
     function renderTossView(match, draft, container) {
+        if (!draft || !draft.teams || !Array.isArray(draft.teams) || draft.teams.length < 2) {
+            renderSetupView(match, container);
+            return;
+        }
+
         const currentUser = Auth.getCurrentUser();
         const currentUserId = currentUser ? currentUser.id : '';
         const isAdmin = Auth.isAdmin();
@@ -1271,9 +1276,17 @@ const Draft = (() => {
 
     /** 3. DRAFT WAR ROOM VIEW (With Live Filters, Audio, Ticker, Undo & Captain Roles) */
     function renderWarRoomView(match, draft, container) {
+        if (!draft || !draft.teams || !Array.isArray(draft.teams) || draft.teams.length < 2) {
+            renderSetupView(match, container);
+            return;
+        }
+
         const currentUser = Auth.getCurrentUser();
         const isAdmin = Auth.isAdmin();
         const currentUserId = currentUser ? currentUser.id : '';
+
+        draft.unpickedPool = Array.isArray(draft.unpickedPool) ? draft.unpickedPool : [];
+        draft.pickOrder = Array.isArray(draft.pickOrder) ? draft.pickOrder : [];
 
         // STRICT ENFORCEMENT: Filter out any waiting list players from unpicked pool
         const confirmedPlaying = (Array.isArray(match.playing) ? match.playing : [])
@@ -1606,6 +1619,11 @@ const Draft = (() => {
 
     /** 4. COMPLETED VIEW: Confetti, Final Rosters, Copy for WhatsApp & Admin Tools */
     function renderCompletedView(match, draft, container) {
+        if (!draft || !draft.teams || !Array.isArray(draft.teams) || draft.teams.length < 2) {
+            renderSetupView(match, container);
+            return;
+        }
+
         stopTurnTimer();
         const isAdmin = Auth.isAdmin();
         SoundFX.playFanfare();
